@@ -35,46 +35,17 @@ function _draw()
 	end
 end
 -->8
---vector2
-function make_v2(x,y)
-	local v={}
-	v.x=x
-	v.y=y
-	return v
-end
+--math
 
 --returns vector2 length
-function get_v2_len(v)
-	return sqrt(v.x*v.x+v.y*v.y)
+function get_vec_len(x,y)
+	return sqrt(x*x+y*y)
 end
 
---normalizes vector2
-function normalize_v2(v)
-	--return if zero vector
-	if v.x==0 and v.y==0 then
-		return
-	end
-	
-	--divide vector by length
-	local ilen=1/get_v2_len(v)
-	v.x*=ilen
-	v.y*=ilen
+--lerp
+function lerp(a,b,t)
+	return a+t*(b-a)
 end
--->8
---rigid body
-function make_rb(x,y)
-	local rb={}
-	
-	--movement
-	rb.pos=make_v2(x,y)
-	rb.vel=make_v2(0,0)
-	rb.movespd=2
-	
-	return rb
-end
--->8
---actor
---function make_actor(x,y)
 -->8
 --ghost
 
@@ -83,8 +54,17 @@ end
 function make_ghost(x,y)
 	local ghost={}
 	
-	--rigid body
-	ghost.rb=make_rb(x,y)
+	--movement
+	ghost.x=x
+	ghost.y=y
+	ghost.vx=0
+	ghost.vy=0
+	ghost.maxspd=4
+	ghost.accel=0.1
+	
+	--input
+	ghost.dx=0
+	ghost.dy=0
 	
 	--add to list
 	add(ghosts,ghost)
@@ -93,23 +73,28 @@ end
 --updates ghost logic
 function update_ghost(ghost)
 	--get input
-	ghost.rb.vel.x=tonum(btn(1))-tonum(btn(0))
-	ghost.rb.vel.y=tonum(btn(3))-tonum(btn(2))
-	normalize_v2(ghost.rb.vel)
+	ghost.dx=tonum(btn(1))-
+		tonum(btn(0))
+	ghost.dy=tonum(btn(3))-
+		tonum(btn(2))
 	
 	--update velocity
-	ghost.rb.vel.x*=ghost.rb.movespd
-	ghost.rb.vel.y*=ghost.rb.movespd
+	ghost.vx=lerp(ghost.vx,
+		ghost.dx*ghost.maxspd,
+		ghost.accel)
+	ghost.vy=lerp(ghost.vy,
+		ghost.dy*ghost.maxspd,
+		ghost.accel)
 	
 	--update position
-	ghost.rb.pos.x+=ghost.rb.vel.x
-	ghost.rb.pos.y+=ghost.rb.vel.y
+	ghost.x+=ghost.vx
+	ghost.y+=ghost.vy
 end
 
 
 --renders the ghost
 function draw_ghost(ghost)
-	spr(1,ghost.rb.pos.x,ghost.rb.pos.y) --face
+	spr(1,ghost.x,ghost.y) --face
 	--trail
 end
 __gfx__
