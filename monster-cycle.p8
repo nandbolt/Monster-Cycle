@@ -98,12 +98,12 @@ function _draw()
 	
 	--menu state
 	if gstate==gst_menu then
-		cursor(32,32)
+		cursor(38,32)
 		print("monster cycle",7)
 		cursor(32,64)
 		print("press 🅾️ to play",7)
-		cursor(32,80)
-		print("created by nandbolt",7)
+		cursor(16,96)
+		print("created by nandbolt(v0.1)",7)
 	else
 		--draw tiles
 		map(0,0,0,0,mw,mh)
@@ -148,10 +148,10 @@ end
 --math
 
 --constants
-mw=128*8 --map size
-hmw=128*4 --half map size
-mh=128*4 --map size
-hmh=128*2 --half map size
+mw=128*8 --map width
+hmw=128*4 --half map width
+mh=128*4 --map height
+hmh=128*2 --half map height
 ss=128 --screen size
 hss=64 --half screen size
 ts=8	--tile size
@@ -544,6 +544,9 @@ function draw_p(p)
 end
 -->8
 --zombie
+--essentially a copy/paste
+--of ghost(done due to lack
+--of time in game jam)
 
 --creates a zombie and adds it
 --to the list of ghosts
