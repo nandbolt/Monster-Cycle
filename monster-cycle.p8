@@ -31,6 +31,12 @@ maxghosts=16
 
 --main init
 function _init()
+	--set refs
+	pinputs={ghost_player_input,
+		zombie_player_input}
+	ninputs={ghost_npc_input,
+		zombie_npc_input}
+	
 	--not menu state
 	if gstate!=gst_menu then
 		--clear run
@@ -41,7 +47,8 @@ function _init()
 		zombies={}
 		
 		--add player
-		make_ghost(hmw+irnd(0,128)-64,hmh+irnd(0,128)-64,true)
+		make_ghost(hmw+irnd(0,128)-64,
+			hmh+irnd(0,128)-64,true)
 	end
 end
 
@@ -129,6 +136,10 @@ function _draw()
 			print("meter:"..player.meter.."/"..player.maxmeter,7)
 			cursor(xx,yy+32)
 			print("time:"..gtime)
+			
+			--debug
+			cursor(xx,yy+40)
+			print("cooldwn:"..player.cooldwn)
 		elseif gstate==gst_dead then
 			cursor(cx+32,cy+32)
 			print("death.",7)
@@ -163,6 +174,10 @@ gst_menu=0 --menu game state
 gst_active=1 --active game state
 gst_dead=2 --dead game state
 gst_complete=3 --complete game state
+goals1={"✽fight ghosts.",
+	"웃eat humans!"}
+goals2={"◆find tombtone!",
+	"⌂find bed!"}
 
 --returns vector2 length
 function get_vec_len(x,y)
@@ -207,55 +222,20 @@ end
 function make_ghost(x,y,is_player)
 	local ghost={}
 	
+	--actor
+	init_actor(ghost,x,y,1,1,2,2,
+	0.1,1,3,90,90,is_player)
+	
 	--states
 	ghost.dashing=false
 	
 	--movement
-	ghost.x=x
-	ghost.y=y
-	ghost.vx=0
-	ghost.vy=0
-	ghost.normspd=2
 	ghost.dashspd=3
-	ghost.maxspd=ghost.normspd
-	ghost.accel=0.1
-	ghost.spr=1
-	ghost.flipx=false
-	ghost.flipy=false
 	
-	--health
-	ghost.maxhp=1
-	ghost.hp=ghost.maxhp
-	
-	--xp
-	ghost.maxxp=3
-	ghost.xp=0
-	
-	--meter
-	ghost.maxmeter=90
-	ghost.meter=ghost.maxmeter
-	
-	--cooldown
-	ghost.maxcooldwn=90
-	ghost.cooldwn=ghost.maxcooldwn
-	
-	--input
-	ghost.dx=0
-	ghost.dy=0
-	ghost.idash=false
-	if is_player then
-		ghost.update_input=ghost_player_input
-		player=ghost
-		player.goal="✽fight ghosts."
-	else
-		ghost.update_input=ghost_npc_input
-		ghost.targ=nil
-		ghost.tx=ghost.x
-		ghost.ty=ghost.y
-		ghost.mstate=st_wander
-		ghost.mcnt=irnd(0,16) --mental counter
-		ghost.tradius=32
-	end
+	--trail
+	ghost.normctrail=12	--normal trail color
+	ghost.dashctrail=1	--dash trail color
+	ghost.ctrail=ghost.normctrail --trail color
 	
 	--add to list
 	add(ghosts,ghost)
@@ -266,13 +246,8 @@ function update_ghost(ghost)
 	--get input
 	ghost.update_input(ghost)
 	
-	--if player
-	if ghost==player then
-		sfx(2)
-	end
-	
 	--update dash
-	if ghost.idash and ghost.meter>0 then
+	if ghost.oaction and ghost.meter>0 then
 		if not ghost.dashing then
 			--burst
 			ghost.vx+=ghost.dx*2
@@ -316,14 +291,14 @@ function update_ghost(ghost)
 	ghost.y=clamp(ghost.y+ghost.vy,0,mh-ts)
 	
 	--update trail
-	local ctrail=12
-	if (ghost.dashing) ctrail=1
-	add_p(ghost.x+irnd(1,6),
-		ghost.y+irnd(1,6),ctrail)
+	ghost.ctrail=ghost.normctrail
 	if (ghost.xp==ghost.maxxp) then
-		add_p(ghost.x+irnd(1,6),
-			ghost.y+irnd(1,6),10)
+		ghost.ctrail=10
+	elseif (ghost.dashing) then
+		ghost.ctrail=ghost.dashctrail
 	end
+	add_p(ghost.x+irnd(1,6),
+		ghost.y+irnd(1,6),ghost.ctrail)
 	
 	--check dash hitbox
 	if ghost.dashing then
@@ -365,7 +340,7 @@ function draw_ghost(ghost)
 		if ghost.dashing then
 			ghost.spr=18
 		else
-			ghost.spr=2
+			ghost.spr=ghost.dspr
 		end
 		
 		--update y facing direction
@@ -379,7 +354,7 @@ function draw_ghost(ghost)
 		if ghost.dashing then
 			ghost.spr=17
 		else
-			ghost.spr=1
+			ghost.spr=ghost.rspr
 		end
 		
 		--update x facing direction
@@ -414,7 +389,7 @@ function ghost_player_input(ghost)
 		tonum(btn(2))
 	
 	--action inputs
-	ghost.idash=btn(4)
+	ghost.oaction=btn(4)
 end
 
 --ghost npc input
@@ -454,7 +429,7 @@ function ghost_kill(ghost,oghost)
 	if ghost==player then
 		sfx(3)
 		if ghost.xp==ghost.maxxp then
-			player.goal="⌂find tombtone!"
+			player.goal=goals2[ghost.idx]
 		end
 	end
 	
@@ -476,7 +451,7 @@ function ghost_ascend(ghost)
 		make_zombie(ghost.x,ghost.y,true)
 		
 		--game complete
-		gstate=gst_complete
+		--gstate=gst_complete
 	else
 		--set npc to zombie
 		make_zombie(ghost.x,ghost.y,false)
@@ -494,7 +469,7 @@ function ghost_npc_think(ghost)
 		 if ghost!=oghost and get_dist(ghost.x,ghost.y,oghost.x,oghost.y)<=ghost.tradius then
 		 	ghost.targ=oghost
 		 	ghost.mstate=st_fight
-		 	ghost.idash=true
+		 	ghost.oaction=true
 		 end
 		end
 	else
@@ -553,55 +528,20 @@ end
 function make_zombie(x,y,is_player)
 	local zombie={}
 	
+	--actor
+	init_actor(zombie,x,y,2,33,34,1,
+	0.1,1,3,90,90,is_player)
+	
 	--states
 	zombie.dashing=false
 	
 	--movement
-	zombie.x=x
-	zombie.y=y
-	zombie.vx=0
-	zombie.vy=0
-	zombie.normspd=1
 	zombie.dashspd=2
-	zombie.maxspd=zombie.normspd
-	zombie.accel=0.1
-	zombie.spr=33
-	zombie.flipx=false
-	zombie.flipy=false
 	
-	--health
-	zombie.maxhp=3
-	zombie.hp=zombie.maxhp
-	
-	--xp
-	zombie.maxxp=1
-	zombie.xp=0
-	
-	--meter
-	zombie.maxmeter=90
-	zombie.meter=zombie.maxmeter
-	
-	--cooldown
-	zombie.maxcooldwn=90
-	zombie.cooldwn=zombie.maxcooldwn
-	
-	--input
-	zombie.dx=0
-	zombie.dy=0
-	zombie.idash=false
-	if is_player then
-		zombie.update_input=zombie_player_input
-		player=zombie
-		player.goal="웃eat humans!"
-	else
-		zombie.update_input=zombie_npc_input
-		zombie.targ=nil
-		zombie.tx=zombie.x
-		zombie.ty=zombie.y
-		zombie.mstate=st_wander
-		zombie.mcnt=irnd(0,16) --mental counter
-		zombie.tradius=32
-	end
+	--trail
+	zombie.normctrail=4	--normal trail color
+	zombie.dashctrail=9	--dash trail color
+	zombie.ctrail=zombie.normctrail --trail color
 	
 	--add to list
 	add(zombies,zombie)
@@ -813,6 +753,76 @@ function zombie_npc_think(zombie)
 			zombie.mstate=st_wander
 		end
 	end
+end
+-->8
+--actor
+
+--init actor
+function init_actor(actor,x,y,
+	idx,rspr,dspr,maxspd,accel,
+	maxhp,maxxp,maxmeter,
+	maxcooldwn,is_player)
+	--type
+	actor.idx=idx
+	
+	--movement
+	actor.x=x --x position
+	actor.y=y --y position
+	actor.vx=0 --x velocity
+	actor.vy=0 --y velocity
+	actor.maxspd=maxspd --current max move speed
+	actor.normspd=maxspd --normal max move speed
+	actor.accel=accel --move acceleration
+	
+	--sprite
+	actor.rspr=rspr --right sprite
+	actor.dspr=dspr --down sprite
+	actor.spr=rspr	--current sprite
+	actor.flipx=false --sprite flip x
+	actor.flipy=false --sprite flip y
+	
+	--health
+	actor.maxhp=maxhp
+	actor.hp=maxhp
+	
+	--xp
+	actor.maxxp=maxxp
+	actor.xp=0
+	
+	--meter
+	actor.maxmeter=maxmeter
+	actor.meter=maxmeter
+	
+	--cooldown
+	actor.maxcooldwn=maxcooldwn
+	actor.cooldwn=maxcooldwn
+	
+	--input
+	actor.dx=0	--x direction
+	actor.dy=0 --y direction
+	actor.oaction=false --🅾️ action
+	actor.xaction=false --❎ action
+	
+	--player or npc
+	if is_player then
+		actor.update_input=pinputs[idx]
+		player=actor
+		player.goal=goals1[idx]
+	else
+		actor.update_input=ninputs[idx]
+		actor.targ=nil	--target
+		actor.tx=actor.x	--target x position
+		actor.ty=actor.y --target y position
+		actor.mstate=st_wander	--mental state
+		actor.mcnt=irnd(0,16) --mental counter
+		actor.tradius=32 --target detection radius
+	end
+end
+
+--updates ghost logic
+function update_actor(actor)
+	--get input
+	actor.update_input(actor)
 end
 __gfx__
 0000000000000000000000002222222244444444333333331dddddd15555555544444f4444444444222222222226622200000000000000000000000000000000
