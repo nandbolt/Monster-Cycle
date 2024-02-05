@@ -223,8 +223,8 @@ function make_ghost(x,y,is_player)
 	local ghost={}
 	
 	--actor
-	init_actor(ghost,x,y,1,1,2,2,
-	0.1,1,3,90,90,is_player)
+	init_actor(ghost,x,y,1,1,2,19,
+	2,0.1,1,3,90,90,is_player)
 	
 	--states
 	ghost.dashing=false
@@ -259,10 +259,12 @@ function update_ghost(ghost)
 			end
 		end
 		ghost.dashing=true
+		ghost.invulnerable=true
 		ghost.cooldwn=ghost.maxcooldwn
 		ghost.meter-=1
 	else
 		ghost.dashing=false
+		ghost.invulnerable=false
 		if ghost.cooldwn<=0 then
 			ghost.meter=ghost.maxmeter
 			ghost.cooldwn=ghost.maxcooldwn
@@ -278,18 +280,6 @@ function update_ghost(ghost)
 		ghost.maxspd=ghost.normspd
 	end
 	
-	--update velocity
-	ghost.vx=lerp(ghost.vx,
-		ghost.dx*ghost.maxspd,
-		ghost.accel)
-	ghost.vy=lerp(ghost.vy,
-		ghost.dy*ghost.maxspd,
-		ghost.accel)
-	
-	--update position
-	ghost.x=clamp(ghost.x+ghost.vx,0,mw-ts)
-	ghost.y=clamp(ghost.y+ghost.vy,0,mh-ts)
-	
 	--update trail
 	ghost.ctrail=ghost.normctrail
 	if (ghost.xp==ghost.maxxp) then
@@ -300,22 +290,14 @@ function update_ghost(ghost)
 	add_p(ghost.x+irnd(1,6),
 		ghost.y+irnd(1,6),ghost.ctrail)
 	
+	--move and collide
+	move_and_collide(ghost)
+	
 	--check dash hitbox
 	if ghost.dashing then
-		for y=ghost.y,ghost.y+ts,ts do
-			for x=ghost.x,ghost.x+ts,ts do
-				for i=#ghosts,1,-1 do
-					local oghost=ghosts[i]
-					local x1=oghost.x
-					local x2=oghost.x+ts
-					local y1=oghost.y
-					local y2=oghost.y+ts
-					local colliding=point_in_box(x,y,x1,y1,x2,y2)
-					if oghost!=ghost and not oghost.dashing and colliding then
-						ghost_kill(ghost,oghost)
-					end
-				end
-			end
+		local oghost=touching(ghost,ghosts)
+		if oghost!=nil then
+			ghost_kill(ghost,oghost)
 		end
 	end
 	
@@ -334,34 +316,57 @@ end
 
 --renders the ghost
 function draw_ghost(ghost)
-	--update sprite
-	if abs(ghost.vx)<abs(ghost.vy) then
+	--if moving
+	if (get_dist(0,0,ghost.vx,
+		ghost.vy)>1) then
+		--diagonal sprite
+		if abs(abs(ghost.vx)-
+			abs(ghost.vy))<1 then
+			if ghost.dashing then
+				ghost.spr=20
+			else
+				ghost.spr=ghost.dgspr
+			end
+			
+			--update facing direction
+			if ghost.vx>0 then
+				ghost.flipx=false
+			else
+				ghost.flipx=true
+			end
+			if ghost.vy>0 then
+				ghost.flipy=false
+			else
+				ghost.flipy=true
+			end
 		--down sprite
-		if ghost.dashing then
-			ghost.spr=18
-		else
-			ghost.spr=ghost.dspr
-		end
-		
-		--update y facing direction
-		if ghost.vy<0 then
-			ghost.flipy=true
-		elseif ghost.vy>0 then
-			ghost.flipy=false
-		end
-	else
+		elseif abs(ghost.vx)<abs(ghost.vy) then
+			if ghost.dashing then
+				ghost.spr=18
+			else
+				ghost.spr=ghost.dspr
+			end
+			
+			--update y facing direction
+			if ghost.vy<0 then
+				ghost.flipy=true
+			elseif ghost.vy>0 then
+				ghost.flipy=false
+			end
 		--right sprite
-		if ghost.dashing then
-			ghost.spr=17
 		else
-			ghost.spr=ghost.rspr
-		end
-		
-		--update x facing direction
-		if ghost.vx<0 then
-			ghost.flipx=true
-		elseif ghost.vx>0 then
-			ghost.flipx=false
+			if ghost.dashing then
+				ghost.spr=17
+			else
+				ghost.spr=ghost.rspr
+			end
+			
+			--update x facing direction
+			if ghost.vx<0 then
+				ghost.flipx=true
+			elseif ghost.vx>0 then
+				ghost.flipx=false
+			end
 		end
 	end
 	
@@ -529,19 +534,8 @@ function make_zombie(x,y,is_player)
 	local zombie={}
 	
 	--actor
-	init_actor(zombie,x,y,2,33,34,1,
-	0.1,1,3,90,90,is_player)
-	
-	--states
-	zombie.dashing=false
-	
-	--movement
-	zombie.dashspd=2
-	
-	--trail
-	zombie.normctrail=4	--normal trail color
-	zombie.dashctrail=9	--dash trail color
-	zombie.ctrail=zombie.normctrail --trail color
+	init_actor(zombie,x,y,2,33,34,
+	35,1,0.1,1,3,90,90,is_player)
 	
 	--add to list
 	add(zombies,zombie)
@@ -552,84 +546,8 @@ function update_zombie(zombie)
 	--get input
 	zombie.update_input(zombie)
 	
-	--update dash
-	if zombie.idash and zombie.meter>0 then
-		if not zombie.dashing then
-			--burst
-			zombie.vx+=zombie.dx*2
-			zombie.vy+=zombie.dy*2
-		end
-		zombie.dashing=true
-		zombie.cooldwn=zombie.maxcooldwn
-		zombie.meter-=1
-	else
-		zombie.dashing=false
-		if zombie.cooldwn<=0 then
-			zombie.meter=zombie.maxmeter
-			zombie.cooldwn=zombie.maxcooldwn
-		else
-			zombie.cooldwn-=1
-		end
-	end
-	
-	--update max speed
-	if zombie.dashing then
-		zombie.maxspd=zombie.dashspd
-	else
-		zombie.maxspd=zombie.normspd
-	end
-	
-	--update velocity
-	zombie.vx=lerp(zombie.vx,
-		zombie.dx*zombie.maxspd,
-		zombie.accel)
-	zombie.vy=lerp(zombie.vy,
-		zombie.dy*zombie.maxspd,
-		zombie.accel)
-	
-	--update position
-	zombie.x=clamp(zombie.x+zombie.vx,0,mw-ts)
-	zombie.y=clamp(zombie.y+zombie.vy,0,mh-ts)
-	
-	--update trail
-	local ctrail=3
-	if (zombie.dashing) ctrail=3
-	add_p(zombie.x+irnd(1,6),
-		zombie.y+irnd(1,6),ctrail)
-	if (zombie.xp==zombie.maxxp) then
-		add_p(zombie.x+irnd(1,6),
-			zombie.y+irnd(1,6),10)
-	end
-	
-	--check dash hitbox
-	if zombie.dashing then
-		for y=zombie.y,zombie.y+ts,ts do
-			for x=zombie.x,zombie.x+ts,ts do
-				for i=#zombies,1,-1 do
-					local ozombie=zombies[i]
-					local x1=ozombie.x
-					local x2=ozombie.x+ts
-					local y1=ozombie.y
-					local y2=ozombie.y+ts
-					local colliding=point_in_box(x,y,x1,y1,x2,y2)
-					if ozombie!=zombie and not ozombie.dashing and colliding then
-						zombie_kill(zombie,ozombie)
-					end
-				end
-			end
-		end
-	end
-	
-	--check gravestone if ready
-	if zombie.xp==zombie.maxxp then
-		for y=zombie.y,zombie.y+ts,ts do
-			for x=zombie.x,zombie.x+ts,ts do
-				if mget(x/ts,y/ts)==6 then
-					zombie_ascend(zombie)
-				end
-			end
-		end
-	end
+	--move and collide
+	move_and_collide(zombie)
 end
 
 
@@ -638,11 +556,7 @@ function draw_zombie(zombie)
 	--update sprite
 	if abs(zombie.vx)<abs(zombie.vy) then
 		--down sprite
-		if zombie.dashing then
-			zombie.spr=34
-		else
-			zombie.spr=34
-		end
+		zombie.spr=zombie.dspr
 		
 		--update y facing direction
 		if zombie.vy<0 then
@@ -651,13 +565,6 @@ function draw_zombie(zombie)
 			zombie.flipy=false
 		end
 	else
-		--right sprite
-		if zombie.dashing then
-			zombie.spr=33
-		else
-			zombie.spr=33
-		end
-		
 		--update x facing direction
 		if zombie.vx<0 then
 			zombie.flipx=true
@@ -671,14 +578,7 @@ function draw_zombie(zombie)
 		1,1,zombie.flipx,zombie.flipy)
 		
 	--draw hitbox
-	--for y=ghost.y,ghost.y+ts do
-		--for x=ghost.x,ghost.x+ts do
-			--if (x==ghost.x or x==ghost.x+ts or
-				--y==ghost.y or y==ghost.y+ts) then
-				--pset(x,y,1)
-			--end
-		--end
-	--end
+	
 end
 
 --ghost player input
@@ -759,7 +659,7 @@ end
 
 --init actor
 function init_actor(actor,x,y,
-	idx,rspr,dspr,maxspd,accel,
+	idx,rspr,dspr,dgspr,maxspd,accel,
 	maxhp,maxxp,maxmeter,
 	maxcooldwn,is_player)
 	--type
@@ -777,6 +677,7 @@ function init_actor(actor,x,y,
 	--sprite
 	actor.rspr=rspr --right sprite
 	actor.dspr=dspr --down sprite
+	actor.dgspr=dgspr --diagonal sprite
 	actor.spr=rspr	--current sprite
 	actor.flipx=false --sprite flip x
 	actor.flipy=false --sprite flip y
@@ -784,6 +685,7 @@ function init_actor(actor,x,y,
 	--health
 	actor.maxhp=maxhp
 	actor.hp=maxhp
+	actor.invulnerable=false
 	
 	--xp
 	actor.maxxp=maxxp
@@ -819,36 +721,81 @@ function init_actor(actor,x,y,
 	end
 end
 
---updates ghost logic
-function update_actor(actor)
-	--get input
-	actor.update_input(actor)
+--moves the actor and handles
+--collisions
+function move_and_collide(actor)
+	--update velocity
+	actor.vx=lerp(actor.vx,
+		actor.dx*actor.maxspd,
+		actor.accel)
+	actor.vy=lerp(actor.vy,
+		actor.dy*actor.maxspd,
+		actor.accel)
+	
+	--update position
+	actor.x=clamp(actor.x+actor.vx,0,mw-ts)
+	actor.y=clamp(actor.y+actor.vy,0,mh-ts)
+end
+
+--checks actor collisions
+-- return: actor or nil
+function touching(actor,pool)
+	for y=actor.y,actor.y+ts,ts do
+		for x=actor.x,actor.x+ts,ts do
+			for i=#pool,1,-1 do
+				local oactor=pool[i]
+				local x1=oactor.x
+				local x2=oactor.x+ts
+				local y1=oactor.y
+				local y2=oactor.y+ts
+				local colliding=point_in_box(x,y,x1,y1,x2,y2)
+				if oactor!=actor and not
+				 oactor.invulnerable and
+				 colliding then
+					return oactor
+				end
+			end
+		end
+	end
+	return nil
+end
+
+--draw rectangular hitbox
+function draw_hitbox(actor)
+	for y=actor.y,actor.y+ts do
+		for x=actor.x,actor.x+ts do
+			if (x==actor.x or x==actor.x+ts or
+				y==actor.y or y==actor.y+ts) then
+				pset(x,y,1)
+			end
+		end
+	end
 end
 __gfx__
 0000000000000000000000002222222244444444333333331dddddd15555555544444f4444444444222222222226622200000000000000000000000000000000
-0000000000cccc0000cccc00222222224444444433333333d555555d56666665ffffffff44444444222222222262262200000000000000000000000000000000
-007007000ccc11c00cccccc0222222224444444433433333d511115d555555554f44444444444444662226622262262200000000000000000000000000000000
+00000000000ccc00000cc000222222224444444433333333d555555d56666665ffffffff44444444222222222262262200000000000000000000000000000000
+0070070000cc11c000cccc00222222224444444433433333d511115d555555554f44444444444444662226622262262200000000000000000000000000000000
 000770000cccccc00cccccc0222222224444424434343333d166661d56656665ffffffff55555555226262262226622200000000000000000000000000000000
 000770000cccccc00c1cc1c0222222224444242433333333d165561d56656665444f444454944445226662262222622200000000000000000000000000000000
-007007000ccc11c00c1cc1c0220222224444444433333333d511115d5555555544f4444455555555662226622226622200000000000000000000000000000000
-0000000000cccc0000cccc00202022224444444433333333d555555d56666665ffffffff44444444222222222262262200000000000000000000000000000000
+0070070000cc11c00c1cc1c0220222224444444433333333d511115d5555555544f4444455555555662226622226622200000000000000000000000000000000
+00000000000ccc0000cccc00202022224444444433333333d555555d56666665ffffffff44444444222222222262262200000000000000000000000000000000
 0000000000000000000000002222222244444444333333331dddddd155555555444444f444444444222222222262262200000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000001111000011110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000111cc100111111000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000011111100111111000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000111111001c11c1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000111cc1001c11c1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000001111000011110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000111000001100000cc0000001100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000000000011cc10001111000ccccc00011111000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000001111110011111100cccc1c001111c100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000000000111111001c11c1000cccc10001111c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000000000011cc1001c11c1000c1ccc0001c11100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000000000001110000111100000c1c000001c1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000333500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000005555000055550000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000053338500533335000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000053333503533335300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000053333503533335300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000053338503583385300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000005555005055550500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000333500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000005555000055550000555533000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000053338500533335005333353000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000053333503533335305333855000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000053333503533335305333350000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000053338503583385305383350000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000005555005055550503555500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000333500000000003350000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
