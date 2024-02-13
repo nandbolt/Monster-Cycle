@@ -10,33 +10,27 @@ gtime=0
 
 --actor pools
 ghosts={}
+wraiths={}
 zombies={}
---skeletons={}
---humans={}
+skeletons={}
+humans={}
 
 --particle system
 ps={}
 
 --camera
-cx=0
-cy=0
-caccel=1
+cam={}
+cam.x=0 --camera x
+cam.y=0 --camera y
+cam.accel=1 --camera acceleration
 
---spawner
-sx=0
-sy=0
-scnt=0 --spawn counter
-sfreq=30 --spawn frequency
-maxghosts=16
+--collisions
+walls={64}
+tombs={80,96}
+beds={97}
 
 --main init
 function _init()
-	--set refs
-	pinputs={ghost_player_input,
-		zombie_player_input}
-	ninputs={ghost_npc_input,
-		zombie_npc_input}
-	
 	--not menu state
 	if gstate!=gst_menu then
 		--clear run
@@ -44,13 +38,15 @@ function _init()
 		
 		--clear pools
 		ghosts={}
+		wraiths={}
 		zombies={}
+		skeletons={}
+		humans={}
 		
 		--add player
-		local sx=hmw+irnd(0,128)-64
-		local sy=hmh+irnd(0,128)-64
-		make_ghost(sx,sy,true)
-		--make_zombie(sx,sy,true)
+		spnr.x=hmw+irnd(0,128)-64
+		spnr.y=hmh+irnd(0,128)-64
+		make_wraith(spnr.x,spnr.y,true)
 	end
 end
 
@@ -67,29 +63,30 @@ function _update()
 		sfx(2)
 		
 		--update spawner
-		scnt+=1
-		if scnt%sfreq==0 and #ghosts<maxghosts then
-			sx=cx+irnd(0,1)*(ss+ts)-ts
-			sy=cy+irnd(0,1)*(ss+ts)-ts
-			make_ghost(sx,sy,false)
-		end
+		update_spawner()
 		
 		--update particles
 		foreach(ps,update_p)
 		
 		--update actors
 		foreach(ghosts,update_ghost)
+		foreach(wraiths,update_wraith)
 		foreach(zombies,update_zombie)
+		foreach(skeletons,update_skeleton)
+		foreach(humans,update_human)
 		
 		--update camera
-		cx=lerp(cx,player.x-hss,caccel)
-		cx=clamp(cx,0,mw-ss)
-		cy=lerp(cy,player.y-hss,caccel)
-		cy=clamp(cy,0,mh-ss)
-		camera(cx,cy)
+		cam.x=lerp(cam.x,player.x-hss,
+			cam.accel)
+		cam.x=clamp(cam.x,0,mw-ss)
+		cam.y=lerp(cam.y,player.y-hss,
+			cam.accel)
+		cam.y=clamp(cam.y,0,mh-ss)
+		camera(cam.x,cam.y)
 		
 		--dead state
-		if gstate==gst_dead or gstate==gst_complete then
+		if gstate==gst_dead or
+			gstate==gst_complete then
 			if btn(5) then
 				gstate=gst_active
 				_init()
@@ -122,12 +119,15 @@ function _draw()
 		
 		--draw actors
 		foreach(ghosts,draw_ghost)
+		foreach(wraiths,draw_wraith)
 		foreach(zombies,draw_zombie)
+		foreach(skeletons,draw_skeleton)
+		foreach(humans,draw_human)
 		
 		--active state
 		if gstate==gst_active then
 			--draw goal
-			local xx,yy=cx,cy+1
+			local xx,yy=cam.x,cam.y+1
 			cursor(xx,yy)
 			print(player.goal,7)
 			cursor(xx,yy+8)
@@ -143,16 +143,16 @@ function _draw()
 			cursor(xx,yy+40)
 			print("cooldwn:"..player.cooldwn)
 		elseif gstate==gst_dead then
-			cursor(cx+32,cy+32)
+			cursor(cam.x+32,cam.y+32)
 			print("death.",7)
-			cursor(cx+32,cy+64)
+			cursor(cam.x+32,cam.y+64)
 			print("❎ to retry",7)
 		elseif gstate==gst_complete then
-			cursor(cx+32,cy+16)
+			cursor(cam.x+32,cam.y+16)
 			print("zombie reborn.",7)
-			cursor(cx+32,cy+24)
+			cursor(cam.x+32,cam.y+24)
 			print("time:"..gtime,7)
-			cursor(cx+32,cy+32)
+			cursor(cam.x+32,cam.y+32)
 			print("❎ to play again",7)
 		end
 	end
@@ -216,6 +216,14 @@ function point_in_box(x,y,x1,y1,x2,y2)
 	end
 	return false
 end
+
+--returns if item is in table
+function in_table(tbl,item)
+	for i=1,#tbl do
+		if (tbl[i]==item) return true
+	end
+	return false
+end
 -->8
 --ghost
 
@@ -225,10 +233,10 @@ function make_ghost(x,y,is_player)
 	local ghost={}
 	
 	--actor
-	init_actor(ghost,x,y,1,1,2,3,
-	2,0.1,1,1,90,90,true,is_player)
+	init_actor(ghost,x,y,is_player)
 	
 	--states
+	ghost.ethereal=true
 	ghost.dashing=false
 	
 	--movement
@@ -238,6 +246,15 @@ function make_ghost(x,y,is_player)
 	ghost.normctrail=12 --normal trail color
 	ghost.dashctrail=1 --dash trail color
 	ghost.ctrail=ghost.normctrail --trail color
+	
+	--player or npc
+	if is_player then
+		ghost.update_input=update_player_input
+		ghost.goal="✽fight ghosts."
+		player=ghost
+	else
+		init_actor_npc(ghost,ghost_npc_input)
+	end
 	
 	--add to list
 	add(ghosts,ghost)
@@ -319,18 +336,6 @@ end
 --renders the ghost
 function draw_ghost(ghost)
 	draw_actor(ghost)
-end
-
---ghost player input
-function ghost_player_input(ghost)
-	--move input
-	ghost.dx=tonum(btn(1))-
-		tonum(btn(0))
-	ghost.dy=tonum(btn(3))-
-		tonum(btn(2))
-	
-	--action inputs
-	ghost.oaction=btn(4)
 end
 
 --ghost npc input
@@ -474,7 +479,7 @@ function make_zombie(x,y,is_player)
 	35,2,0.1,1,3,90,90,false,is_player)
 	
 	--dash
-	zombie.dashging=false
+	zombie.dashing=false
 	
 	--add to list
 	add(zombies,zombie)
@@ -493,18 +498,6 @@ end
 --renders the zombie
 function draw_zombie(zombie)
 	draw_actor(zombie)
-end
-
---ghost player input
-function zombie_player_input(zombie)
-	--move input
-	zombie.dx=tonum(btn(1))-
-		tonum(btn(0))
-	zombie.dy=tonum(btn(3))-
-		tonum(btn(2))
-	
-	--action inputs
-	zombie.idash=btn(4)
 end
 
 --zombie npc input
@@ -572,68 +565,71 @@ end
 --actor
 
 --init actor
-function init_actor(a,x,y,
-	idx,rspr,dspr,dgspr,maxspd,accel,
-	maxhp,maxxp,maxmeter,
-	maxcooldwn,ethereal,is_player)
-	--type
-	a.idx=idx
-	a.ethereal=ethereal
-	
+function init_actor(a,x,y,is_player)
 	--movement
 	a.x=x --x position
 	a.y=y --y position
 	a.vx=0 --x velocity
 	a.vy=0 --y velocity
-	a.maxspd=maxspd --current max move speed
-	a.normspd=maxspd --normal max move speed
-	a.accel=accel --move acceleration
+	a.maxspd=2 --current max move speed
+	a.normspd=2 --normal max move speed
+	a.accel=0.1 --move acceleration
+	a.ethereal=false --ethereal=no wall collisions
 	
 	--sprite
-	a.rspr=rspr --right sprite
-	a.dspr=dspr --down sprite
-	a.dgspr=dgspr --diagonal sprite
-	a.spr=rspr --current sprite
+	a.rspr=1 --right sprite
+	a.dspr=2 --down sprite
+	a.dgspr=3 --diagonal sprite
+	a.spr=1 --current sprite
 	a.flipx=false --sprite flip x
 	a.flipy=false --sprite flip y
 	
 	--health
-	a.maxhp=maxhp
-	a.hp=maxhp
+	a.maxhp=1
+	a.hp=1
 	a.invulnerable=false
 	
 	--xp
-	a.maxxp=maxxp
+	a.maxxp=1
 	a.xp=0
 	
 	--meter
-	a.maxmeter=maxmeter
-	a.meter=maxmeter
+	a.maxmeter=90
+	a.meter=90
 	
 	--cooldown
-	a.maxcooldwn=maxcooldwn
-	a.cooldwn=maxcooldwn
+	a.maxcooldwn=90
+	a.cooldwn=90
 	
 	--input
 	a.dx=0 --x direction
 	a.dy=0 --y direction
 	a.oaction=false --🅾️ action
 	a.xaction=false --❎ action
+end
+
+--inits vars for npc actor
+function init_actor_npc(a,uinput)
+	a.update_input=uinput
+	a.targ=nil	--target
+	a.tx=a.x	--target x position
+	a.ty=a.y --target y position
+	a.mstate=st_wander	--mental state
+	a.mcnt=irnd(0,16) --mental counter
+	a.tradius=32 --target detection radius
+end
+
+--updates player actor input
+function update_player_input()
+	--move input
+	player.dx=tonum(btn(1))-
+		tonum(btn(0))
+	player.dy=tonum(btn(3))-
+		tonum(btn(2))
 	
-	--player or npc
-	if is_player then
-		a.update_input=pinputs[idx]
-		a.goal=goals1[idx]
-		player=a
-	else
-		a.update_input=ninputs[idx]
-		a.targ=nil	--target
-		a.tx=a.x	--target x position
-		a.ty=a.y --target y position
-		a.mstate=st_wander	--mental state
-		a.mcnt=irnd(0,16) --mental counter
-		a.tradius=32 --target detection radius
-	end
+	--action inputs
+	player.oaction=btn(4)
+	player.xaction=btn(5)
 end
 
 --moves the actor and handles
@@ -653,7 +649,7 @@ function move_and_collide(a)
 	local tx=(bb+a.vx)/ts
 	local ty=a.y/ts
 	if not a.ethereal and
-		mget(tx,ty)==7 then
+		in_table(walls,mget(tx,ty)) then
 		a.vx=0
 	end
 	a.x=clamp(a.x+a.vx,0,mw-ts)
@@ -665,7 +661,7 @@ function move_and_collide(a)
 	tx=a.x/ts
 	ty=(bb+a.vy)/ts
 	if not a.ethereal and 
-		mget(tx,ty)==7 then
+		in_table(walls,mget(tx,ty)) then
 		a.vy=0
 	end
 	a.y=clamp(a.y+a.vy,0,mh-ts)
@@ -776,14 +772,107 @@ function draw_actor(a)
 		--end
 	--end
 end
+-->8
+--wraith
+
+--creates wraith, adds to pool
+function make_wraith(x,y,is_player)
+	local wraith={}
+	
+	--actor
+	init_actor(wraith,x,y,is_player)
+	
+	--sprite
+	wraith.rspr=4
+	wraith.dspr=5
+	wraith.dgspr=6
+	wraith.spr=4
+	
+	--trail
+	wraith.ctrail=5 --trail color
+	
+	--player or npc
+	if is_player then
+		wraith.update_input=update_player_input
+		wraith.goal="✽fight wraiths."
+		player=wraith
+	else
+		init_actor_npc(wraith,wraith_npc_input)
+	end
+	
+	--add to list
+	add(wraiths,wraith)
+end
+
+--updates wraith logic
+function update_wraith(wraith)
+	--get input
+	wraith.update_input(wraith)
+	
+	--update trail
+	add_p(wraith.x+irnd(1,6),
+		wraith.y+irnd(1,6),wraith.ctrail)
+	
+	--move and collide
+	move_and_collide(wraith)
+end
+
+--renders the wraith
+function draw_wraith(wraith)
+	draw_actor(wraith)
+end
+
+--wraith npc input
+function wraith_npc_input(wraith)
+	--update target
+	wraith.tx=wraith.x+irnd(0,64)-32
+	wraith.ty=wraith.y+irnd(0,64)-32
+	
+	--update input direction
+	wraith.dx=clamp(wraith.tx-wraith.x,-1,1)
+	wraith.dy=clamp(wraith.ty-wraith.y,-1,1)
+end
+
+--wraith npc think
+function wraith_npc_think(wraith)
+end
+-->8
+--spawner
+spnr={}
+spnr.x=0 --spawner x
+spnr.y=0 --spawner y
+spnr.cnt=0 --spawn counter
+spnr.freq=30 --spawn frequency
+spnr.maxghosts=12 --max ghost spawns
+spnr.maxwraiths=4 --max wraith spawns
+spnr.maxzombies=4 --max zombie spawns
+spnr.maxskeletons=4 --max skeleton spawns
+spnr.maxhumans=4 --max human spawns
+
+--update spawner
+function update_spawner()
+	spnr.cnt+=1
+	if spnr.cnt%spnr.freq==0 then 
+		local n=irnd(0,1)
+		if n==0 and #ghosts<spnr.maxghosts then
+			spnr.x=cam.x+irnd(0,1)*(ss+ts)-ts
+			spnr.y=cam.y+irnd(0,1)*(ss+ts)-ts
+			make_ghost(spnr.x,spnr.y,false)
+		elseif #wraiths<spnr.maxwraiths then
+			spnr.x=cam.x+irnd(0,1)*(ss+ts)-ts
+			spnr.y=cam.y+irnd(0,1)*(ss+ts)-ts
+			make_wraith(spnr.x,spnr.y,false)
+		end
+	end
+end
 __gfx__
-00000000000000000000000000000000000000000000000000070000000fff4000000040004f0000222222222226622200000000000000000000000000000000
-00000000000ccc00000cc00000cc00000077550000700700007770004f444400004444f0004444ff222222222262262200000000000000000000000000000000
-0070070000cc11c000cccc000ccccc0007777570077777700777770004fff04004ffff4004ffff4f662226622262262200000000000000000000000000000000
-000770000cccccc00cccccc00cccc1c000777700077777707777755004ffff4044ffff4f04fff044226262262226622200000000000000000000000000000000
-000770000cccccc00c1cc1c000cccc1000777700057777500777775004ffff4044ffff4f04ffff40226662262222622200000000000000000000000000000000
-0070070000cc11c00c1cc1c000c1ccc007777570055775500075770004fff040040ff04f04f0ff40662226622226622200000000000000000000000000000000
-00000000000ccc0000cccc00000c1c00007755000070070000055000004444f40f44440404444400222222222262262200000000000000000000000000000000
+00000000000000000000000000000000000000000000000000050000000fff4000000040004f0000222222222226622200000000000000000000000000000000
+00000000000ccc00000cc00000cc00000055770000500500005550004f444400004444f0004444ff222222222262262200000000000000000000000000000000
+0070070000cc11c000cccc000ccccc0005555750055555500555550004fff04004ffff4004ffff4f662226622262262200000000000000000000000000000000
+000770000cccccc00cccccc00cccc1c000555500055555505555577004ffff4044ffff4f04fff044226262262226622200000000000000000000000000000000
+000770000cccccc00c1cc1c000cccc1000555500075555700555557004ffff4044ffff4f04ffff40226662262222622200000000000000000000000000000000
+0070070000cc11c00c1cc1c000c1ccc005555750077557700057550004fff040040ff04f04f0ff40662226622226622200000000000000000000000000000000
+00000000000ccc0000cccc00000c1c00005577000050050000077000004444f40f44440404444400222222222262262200000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000044000040000000440f400222222222262262200000000000000000000000000000000
 33333333000000000000000000000000000000000000000000050000000440000400000000000000000000000000000000000000000000000000000000000000
 33333333000111000001100000110000005588000050050000555000004444f40f44440000444444000000000000000000000000000000000000000000000000
