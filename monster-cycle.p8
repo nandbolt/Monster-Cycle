@@ -46,7 +46,8 @@ function _init()
 		--add player
 		spnr.x=hmw+irnd(0,128)-64
 		spnr.y=hmh+irnd(0,128)-64
-		make_wraith(spnr.x,spnr.y,true)
+		--make_wraith(spnr.x,spnr.y,true)
+		make_human(spnr.x,spnr.y,true)
 	end
 end
 
@@ -142,11 +143,13 @@ function _draw()
 			--debug
 			cursor(xx,yy+40)
 			print("cooldwn:"..player.cooldwn)
+		--death menu
 		elseif gstate==gst_dead then
 			cursor(cam.x+32,cam.y+32)
 			print("death.",7)
 			cursor(cam.x+32,cam.y+64)
 			print("❎ to retry",7)
+		--victory menu
 		elseif gstate==gst_complete then
 			cursor(cam.x+32,cam.y+16)
 			print("zombie reborn.",7)
@@ -237,14 +240,14 @@ function make_ghost(x,y,is_player)
 	
 	--states
 	ghost.ethereal=true
-	ghost.dashing=false
 	
-	--movement
+	--dash
+	ghost.dashing=false
 	ghost.dashspd=3
+	ghost.dashctrail=1 --dash trail color
 	
 	--trail
 	ghost.normctrail=12 --normal trail color
-	ghost.dashctrail=1 --dash trail color
 	ghost.ctrail=ghost.normctrail --trail color
 	
 	--player or npc
@@ -465,9 +468,6 @@ function draw_p(p)
 end
 -->8
 --zombie
---essentially a copy/paste
---of ghost(done due to lack
---of time in game jam)
 
 --creates a zombie and adds it
 --to the list of ghosts
@@ -475,11 +475,22 @@ function make_zombie(x,y,is_player)
 	local zombie={}
 	
 	--actor
-	init_actor(zombie,x,y,2,33,34,
-	35,2,0.1,1,3,90,90,false,is_player)
+	init_actor(zombie,x,y,is_player)
 	
-	--dash
-	zombie.dashing=false
+	--sprite
+	zombie.rsprs={33,49}
+	zombie.dsprs={34,50}
+	zombie.dgsprs={35,51}
+	zombie.sprs=zombie.rsprs
+	
+	--player or npc
+	if is_player then
+		zombie.update_input=update_player_input
+		zombie.goal="웃eat humans."
+		player=zombie
+	else
+		init_actor_npc(zombie,zombie_npc_input)
+	end
 	
 	--add to list
 	add(zombies,zombie)
@@ -494,72 +505,24 @@ function update_zombie(zombie)
 	move_and_collide(zombie)
 end
 
-
 --renders the zombie
 function draw_zombie(zombie)
 	draw_actor(zombie)
 end
 
---zombie npc input
+-- npc input
 function zombie_npc_input(zombie)
-	--update state
-	zombie.mcnt+=1
-	if (zombie.mcnt%2)==0 then
-		zombie_npc_think(zombie)
-	end
-	
-	--states
-	if zombie.mstate==st_fight then
-		--update target position
-		if zombie.targ!=nil then
-			zombie.tx=zombie.targ.x+irnd(0,64)-32
-			zombie.ty=zombie.targ.y+irnd(0,64)-32
-		end
-	else
-		--update target
-		if (zombie.mcnt%30)==0 then
-			zombie.tx=zombie.x+irnd(0,64)-32
-			zombie.ty=zombie.y+irnd(0,64)-32
-		end
-	end
+	--update target
+	zombie.tx=zombie.x+irnd(0,64)-32
+	zombie.ty=zombie.y+irnd(0,64)-32
 	
 	--update input direction
 	zombie.dx=clamp(zombie.tx-zombie.x,-1,1)
 	zombie.dy=clamp(zombie.ty-zombie.y,-1,1)
 end
 
---zombie kill
-function zombie_kill(zombie,ozombie)
-	--add xp
-	zombie.xp=clamp(zombie.xp+1,0,zombie.maxxp)
-	
-	--destroy other zombie
-	del(zombies,ozombie)
-end
-
---zombie ascend
-function zombie_ascend(zombie)	
-	--destroy zombie
-	del(zombies,zombie)
-end
-
 --zombie npc think
 function zombie_npc_think(zombie)
-	if (zombie.mstate==st_wander) then
-		--check near target
-		for ozombie in all(zombie) do
-		 if zombie!=ozombie and get_dist(zombie.x,zombie.y,ozombie.x,ozombie.y)<=zombie.tradius then
-		 	zombie.targ=ozombie
-		 	zombie.mstate=st_fight
-		 	zombie.idash=true
-		 end
-		end
-	else
-		local dist = get_dist(zombie.x,zombie.y,zombie.targ.x,zombie.targ.y)
-		if zombie.targ==nil or dist>zombie.tradius then
-			zombie.mstate=st_wander
-		end
-	end
 end
 -->8
 --actor
@@ -571,16 +534,20 @@ function init_actor(a,x,y,is_player)
 	a.y=y --y position
 	a.vx=0 --x velocity
 	a.vy=0 --y velocity
+	a.spd=0 --speed (for queries)
 	a.maxspd=2 --current max move speed
 	a.normspd=2 --normal max move speed
 	a.accel=0.1 --move acceleration
 	a.ethereal=false --ethereal=no wall collisions
 	
 	--sprite
-	a.rspr=1 --right sprite
-	a.dspr=2 --down sprite
-	a.dgspr=3 --diagonal sprite
-	a.spr=1 --current sprite
+	a.rsprs={1} --right sprites
+	a.dsprs={2} --down sprites
+	a.dgsprs={3} --diagonal sprites
+	a.sprs=a.rsprs --current sprites
+	a.spridx=1 --current sprite index
+	a.animspd=1 --animation speed (frames per second)
+	a.animcnt=0 --animation counter
 	a.flipx=false --sprite flip x
 	a.flipy=false --sprite flip y
 	
@@ -665,6 +632,9 @@ function move_and_collide(a)
 		a.vy=0
 	end
 	a.y=clamp(a.y+a.vy,0,mh-ts)
+	
+	--update speed
+	a.spd=get_vec_len(a.vx,a.vy)
 end
 
 --checks actor collisions
@@ -704,6 +674,16 @@ end
 
 --renders the actor
 function draw_actor(a)
+	--update sprites
+	a.animcnt+=a.spd*3
+	if a.animcnt>=30 then
+		a.animcnt=a.animcnt%30
+		a.spridx+=1
+		if a.spridx>#a.sprs then
+			a.spridx=1
+		end
+	end
+	
 	--if moving
 	if (get_dist(0,0,a.vx,
 		a.vy)>a.maxspd/2) then
@@ -711,9 +691,9 @@ function draw_actor(a)
 		if abs(abs(a.vx)-
 			abs(a.vy))<1 then
 			if a.dashing then
-				a.spr=19
+				a.sprs={19}
 			else
-				a.spr=a.dgspr
+				a.sprs=a.dgsprs
 			end
 			
 			--update facing direction
@@ -730,9 +710,9 @@ function draw_actor(a)
 		--down sprite
 		elseif abs(a.vx)<abs(a.vy) then
 			if a.dashing then
-				a.spr=18
+				a.sprs={18}
 			else
-				a.spr=a.dspr
+				a.sprs=a.dsprs
 			end
 			
 			--update y facing direction
@@ -744,9 +724,9 @@ function draw_actor(a)
 		--right sprite
 		else
 			if a.dashing then
-				a.spr=17
+				a.sprs={17}
 			else
-				a.spr=a.rspr
+				a.sprs=a.rsprs
 			end
 			
 			--update x facing direction
@@ -759,7 +739,7 @@ function draw_actor(a)
 	end
 	
 	--ghost sprite
-	spr(a.spr,a.x,a.y,
+	spr(a.sprs[a.spridx],a.x,a.y,
 		1,1,a.flipx,a.flipy)
 		
 	--draw hitbox
@@ -783,10 +763,10 @@ function make_wraith(x,y,is_player)
 	init_actor(wraith,x,y,is_player)
 	
 	--sprite
-	wraith.rspr=4
-	wraith.dspr=5
-	wraith.dgspr=6
-	wraith.spr=4
+	wraith.rsprs={4}
+	wraith.dsprs={5}
+	wraith.dgsprs={6}
+	wraith.sprs={4}
 	
 	--trail
 	wraith.ctrail=5 --trail color
@@ -849,53 +829,190 @@ spnr.maxzombies=4 --max zombie spawns
 spnr.maxskeletons=4 --max skeleton spawns
 spnr.maxhumans=4 --max human spawns
 
+--update spawn point
+-- if not ethereal, dont
+-- spawn in walls
+function update_spawnpoint(ethereal)
+	spnr.x=cam.x+irnd(0,1)*(ss+ts)-ts
+	spnr.y=cam.y+irnd(0,1)*(ss+ts)-ts
+end
+
 --update spawner
 function update_spawner()
 	spnr.cnt+=1
 	if spnr.cnt%spnr.freq==0 then 
-		local n=irnd(0,1)
+		local n=irnd(0,4)
 		if n==0 and #ghosts<spnr.maxghosts then
-			spnr.x=cam.x+irnd(0,1)*(ss+ts)-ts
-			spnr.y=cam.y+irnd(0,1)*(ss+ts)-ts
+			update_spawnpoint(true)
 			make_ghost(spnr.x,spnr.y,false)
 		elseif #wraiths<spnr.maxwraiths then
-			spnr.x=cam.x+irnd(0,1)*(ss+ts)-ts
-			spnr.y=cam.y+irnd(0,1)*(ss+ts)-ts
+			update_spawnpoint(true)
 			make_wraith(spnr.x,spnr.y,false)
+		elseif #zombies<spnr.maxzombies then
+			update_spawnpoint(false)
+			make_zombie(spnr.x,spnr.y,false)
+		elseif #skeletons<spnr.maxskeletons then
+			update_spawnpoint(false)
+			make_skeleton(spnr.x,spnr.y,false)
+		elseif #humans<spnr.maxhumans then
+			update_spawnpoint(false)
+			make_human(spnr.x,spnr.y,false)
 		end
 	end
+end
+-->8
+--skeleton
+
+--creates a zombie and adds it
+--to the list of skeletons
+function make_skeleton(x,y,is_player)
+	local skeleton={}
+	
+	--actor
+	init_actor(skeleton,x,y,is_player)
+	
+	--sprite
+	skeleton.rsprs={36,52}
+	skeleton.dsprs={37,53}
+	skeleton.dgsprs={38,54}
+	skeleton.sprs=skeleton.rsprs
+	
+	--player or npc
+	if is_player then
+		skeleton.update_input=update_player_input
+		skeleton.goal="웃fight humans."
+		player=skeleton
+	else
+		init_actor_npc(skeleton,skeleton_npc_input)
+	end
+	
+	--add to list
+	add(skeletons,skeleton)
+end
+
+--updates zombie logic
+function update_skeleton(skeleton)
+	--get input
+	skeleton.update_input(skeleton)
+	
+	--move and collide
+	move_and_collide(skeleton)
+end
+
+--renders the skeleton
+function draw_skeleton(skeleton)
+	draw_actor(skeleton)
+end
+
+-- npc input
+function skeleton_npc_input(skeleton)
+	--update target
+	skeleton.tx=skeleton.x+irnd(0,64)-32
+	skeleton.ty=skeleton.y+irnd(0,64)-32
+	
+	--update input direction
+	skeleton.dx=clamp(skeleton.tx-skeleton.x,-1,1)
+	skeleton.dy=clamp(skeleton.ty-skeleton.y,-1,1)
+end
+
+--skeleton npc think
+function skeleton_npc_think(skeleton)
+end
+-->8
+--human
+
+--creates a human and adds it
+--to the list of humans
+function make_human(x,y,is_player)
+	local human={}
+	
+	--actor
+	init_actor(human,x,y,is_player)
+	
+	--sprite
+	if rnd(1)<0.5 then
+		human.rsprs={7,23}
+		human.dsprs={8,24}
+		human.dgsprs={9,25}
+	else
+		human.rsprs={39,55}
+		human.dsprs={40,56}
+		human.dgsprs={41,57}
+	end
+	human.sprs=human.rsprs
+	
+	--player or npc
+	if is_player then
+		human.update_input=update_player_input
+		human.goal="✽kill monsters"
+		player=human
+	else
+		init_actor_npc(human,human_npc_input)
+	end
+	
+	--add to list
+	add(humans,human)
+end
+
+--updates human logic
+function update_human(human)
+	--get input
+	human.update_input(human)
+	
+	--move and collide
+	move_and_collide(human)
+end
+
+--renders the human
+function draw_human(human)
+	draw_actor(human)
+end
+
+-- npc input
+function human_npc_input(human)
+	--update target
+	human.tx=human.x+irnd(0,64)-32
+	human.ty=human.y+irnd(0,64)-32
+	
+	--update input direction
+	human.dx=clamp(human.tx-human.x,-1,1)
+	human.dy=clamp(human.ty-human.y,-1,1)
+end
+
+--human npc think
+function human_npc_think(human)
 end
 __gfx__
 00000000000000000000000000000000000000000000000000050000000fff4000000040004f0000222222222226622200000000000000000000000000000000
 00000000000ccc00000cc00000cc00000055770000500500005550004f444400004444f0004444ff222222222262262200000000000000000000000000000000
-0070070000cc11c000cccc000ccccc0005555750055555500555550004fff04004ffff4004ffff4f662226622262262200000000000000000000000000000000
-000770000cccccc00cccccc00cccc1c000555500055555505555577004ffff4044ffff4f04fff044226262262226622200000000000000000000000000000000
+0070070000cc11c000cccc000ccccc0005555750055555500555550004fff14004ffff4004ffff4f662226622262262200000000000000000000000000000000
+000770000cccccc00cccccc00cccc1c000555500055555505555577004ffff4044ffff4f04fff144226262262226622200000000000000000000000000000000
 000770000cccccc00c1cc1c000cccc1000555500075555700555557004ffff4044ffff4f04ffff40226662262222622200000000000000000000000000000000
-0070070000cc11c00c1cc1c000c1ccc005555750077557700057550004fff040040ff04f04f0ff40662226622226622200000000000000000000000000000000
+0070070000cc11c00c1cc1c000c1ccc005555750077557700057550004fff140041ff14f04f1ff40662226622226622200000000000000000000000000000000
 00000000000ccc0000cccc00000c1c00005577000050050000077000004444f40f44440404444400222222222262262200000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000044000040000000440f400222222222262262200000000000000000000000000000000
 33333333000000000000000000000000000000000000000000050000000440000400000000000000000000000000000000000000000000000000000000000000
 33333333000111000001100000110000005588000050050000555000004444f40f44440000444444000000000000000000000000000000000000000000000000
-334333330011cc10001111000111110005555850055555500555550004fff04004ffff4044ffff44000000000000000000000000000000000000000000000000
-34343333011111100111111001111c1000555500055555505555588004ffff40f4ffff44f4fff040000000000000000000000000000000000000000000000000
+334333330011cc10001111000111110005555850055555500555550004fff14004ffff4044ffff44000000000000000000000000000000000000000000000000
+34343333011111100111111001111c1000555500055555505555588004ffff40f4ffff44f4fff140000000000000000000000000000000000000000000000000
 333333330111111001c11c10001111c000555500085555800555558004ffff40f4ffff4404ffff4f000000000000000000000000000000000000000000000000
-333333330011cc1001c11c10001c111005555850088558800058550004fff040f40ff04004f0ff44000000000000000000000000000000000000000000000000
+333333330011cc1001c11c10001c111005555850088558800058550004fff140f41ff14004f1ff44000000000000000000000000000000000000000000000000
 3333333300011100001111000001c1000055880000500500000880004f444400404444f00f444400000000000000000000000000000000000000000000000000
 33333333000000000000000000000000000000000000000000000000000fff40000000400ff40000000000000000000000000000000000000000000000000000
 2222222200033350000000500005300000dd77d000dddd0000dddd00000444500000005000540000000000000000000000000000000000000000000000000000
 222222225355550000555530005555330d77dd000d7777d00d707dd7545555000055554000555544000000000000000000000000000000000000000000000000
-22222222053338500533335005333353d7007dd0d707707dd77707d7054440500544445005444454000000000000000000000000000000000000000000000000
-22222222053333503533335305333855d77777d0d707707dd0777ddd054444505544445405444055000000000000000000000000000000000000000000000000
+22222222053338500533335005333353d7007dd0d707707dd77707d7054441500544445005444454000000000000000000000000000000000000000000000000
+22222222053333503533335305333855d77777d0d707707dd0777ddd054444505544445405444155000000000000000000000000000000000000000000000000
 22222222053333503533335305333350d77777d0dd7777d7d70777d0054444505544445405444450000000000000000000000000000000000000000000000000
-22022222053338503583385305383350d7007dd00dd77dd7dd7d7dd0054440500504405405404450000000000000000000000000000000000000000000000000
+22022222053338503583385305383350d7007dd00dd77dd7dd7d7dd0054441500514415405414450000000000000000000000000000000000000000000000000
 202022220055553553555505035555000d77dd7d07dddd0d0ddddd00005555450455550505555500000000000000000000000000000000000000000000000000
 2222222200033350050000000335350000ddd0000d0000000007d000000550000500000005504500000000000000000000000000000000000000000000000000
 4444444400033350050000000000000000ddd00000dddd0000dddd00000550000500000000000000000000000000000000000000000000000000000000000000
 444444440055553503555500005555330d77dd7d0d7777d00d707dd0005555450455550000555555000000000000000000000000000000000000000000000000
-44444444053338500533335005333353d7007dd0d707707dd77707d0054440500544445055444455000000000000000000000000000000000000000000000000
-44444244053333503533335355333855d77777d0d707707dd0777dd7054444504544445545444050000000000000000000000000000000000000000000000000
+44444444053338500533335005333353d7007dd0d707707dd77707d0054441500544445055444455000000000000000000000000000000000000000000000000
+44444244053333503533335355333855d77777d0d707707dd0777dd7054444504544445545444150000000000000000000000000000000000000000000000000
 44442424053333503533335335333353d77777d07d7777ddd70777dd054444504544445505444454000000000000000000000000000000000000000000000000
-44444444053338503583385305383355d7007dd07dd77dd0dd7d7dd0054440504504405005404455000000000000000000000000000000000000000000000000
+44444444053338503583385305383355d7007dd07dd77dd0dd7d7dd0054441504514415005414455000000000000000000000000000000000000000000000000
 444444445355550050555535035555000d77dd00d0dddd700ddddd00545555005055554004555500000000000000000000000000000000000000000000000000
 4444444400033350000000500335000000dd77d0000000d0077d0000000444500000005004450000000000000000000000000000000000000000000000000000
 55555555222222222226622200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
