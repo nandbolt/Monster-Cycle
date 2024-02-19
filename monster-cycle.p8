@@ -6,7 +6,7 @@ __lua__
 
 --game state
 gstate=0
-gtime=0
+gtime=0 --game time (steps)
 
 --actor pools
 ghosts={}
@@ -43,11 +43,41 @@ function _init()
 		skeletons={}
 		humans={}
 		
+		--preprocess enemies
+		for i=1,4 do
+			spnr.x=irnd(0,mw)
+			spnr.y=irnd(0,mw)
+			make_ghost(spnr.x,spnr.y,false)
+		end
+		for i=1,4 do
+			spnr.x=irnd(0,mw)
+			spnr.y=irnd(0,mw)
+			make_wraith(spnr.x,spnr.y,false)
+		end
+		for i=1,2 do
+			spnr.x=irnd(0,mw)
+			spnr.y=irnd(0,mw)
+			make_zombie(spnr.x,spnr.y,false)
+		end
+		for i=1,2 do
+			spnr.x=irnd(0,mw)
+			spnr.y=irnd(0,mw)
+			make_skeleton(spnr.x,spnr.y,false)
+		end
+		for i=1,4 do
+			spnr.x=irnd(0,mw)
+			spnr.y=irnd(0,mw)
+			make_human(spnr.x,spnr.y,false)
+		end
+		
 		--add player
 		spnr.x=hmw+irnd(0,128)-64
 		spnr.y=hmh+irnd(0,128)-64
-		--make_wraith(spnr.x,spnr.y,true)
-		make_human(spnr.x,spnr.y,true)
+		if rnd(1)<0.5 then
+			make_ghost(spnr.x,spnr.y,true)
+		else
+			make_wraith(spnr.x,spnr.y,true)
+		end
 	end
 end
 
@@ -93,7 +123,7 @@ function _update()
 				_init()
 			end
 		else
-			gtime+=1/30
+			gtime+=1
 		end
 	end
 end
@@ -105,12 +135,28 @@ function _draw()
 	
 	--menu state
 	if gstate==gst_menu then
-		cursor(38,32)
+		local xx,yy=16,24
+		cls(2)
+		
+		--title
+		cursor(xx,yy)
+		print("monster cycle",1)
+		cursor(xx+1,yy+1)
 		print("monster cycle",7)
-		cursor(32,64)
+		
+		--game mode prompts
+		yy+=32
+		cursor(xx,yy)
+		print("press 🅾️ to play",1)
+		cursor(xx+1,yy+1)
 		print("press 🅾️ to play",7)
-		cursor(16,96)
-		print("created by nandbolt(v0.1)",7)
+		
+		--credits
+		yy+=32
+		cursor(xx,yy)
+		print("created by nandbolt(v0.2)",1)
+		cursor(xx+1,yy+1)
+		print("created by nandbolt(v0.2)",7)
 	else
 		--draw tiles
 		map(0,0,0,0,mw,mh)
@@ -127,35 +173,103 @@ function _draw()
 		
 		--active state
 		if gstate==gst_active then
-			--draw goal
-			local xx,yy=cam.x,cam.y+1
-			cursor(xx,yy)
-			print(player.goal,7)
-			cursor(xx,yy+8)
-			print("hp:"..player.hp.."/"..player.maxhp,7)
-			cursor(xx,yy+16)
-			print("xp:"..player.xp.."/"..player.maxxp,7)
-			cursor(xx,yy+24)
-			print("meter:"..player.meter.."/"..player.maxmeter,7)
-			cursor(xx,yy+32)
-			print("time:"..gtime)
+			local xx,yy=cam.x+1,cam.y+1
+			local val=0
 			
-			--debug
-			cursor(xx,yy+40)
-			print("cooldwn:"..player.cooldwn)
+			--goal
+			cursor(xx,yy)
+			print(player.goal,1)
+			cursor(xx+1,yy+1)
+			print(player.goal,7)
+			
+			--timer
+			yy+=8
+			local seconds=flr(gtime/30)
+			cursor(xx,yy)
+			print("time:"..seconds,1)
+			cursor(xx+1,yy+1)
+			print("time:"..seconds,7)
+			
+			--xp
+			yy+=8
+			val=player.xp/player.maxxp
+			rectfill(xx,yy,xx+32,yy+2,1)
+			rectfill(xx+1,yy+1,xx+1+ceil(32*val),yy+3,10)
+			
+			--meter
+			yy+=6
+			val=player.meter/player.maxmeter
+			rectfill(xx,yy,xx+32,yy+2,1)
+			rectfill(xx+1,yy+1,xx+1+flr(32*val),yy+3,7)
+			
+			--cooldown
+			yy+=6
+			val=player.cooldwn/player.maxcooldwn
+			rectfill(xx,yy,xx+32,yy+2,1)
+			rectfill(xx+1,yy+1,xx+1+flr(32*val),yy+3,13)
+			
+			--actors
+			yy+=8
+			val=#ghosts
+			cursor(xx,yy)
+			print("🐱 "..val,1)
+			cursor(xx+1,yy+1)
+			print("🐱 "..val,12)
+			yy+=8
+			val=#wraiths
+			cursor(xx,yy)
+			print("🐱 "..val,1)
+			cursor(xx+1,yy+1)
+			print("🐱 "..val,5)
+			yy+=8
+			val=#zombies
+			cursor(xx,yy)
+			print("😐 "..val,1)
+			cursor(xx+1,yy+1)
+			print("😐 "..val,3)
+			yy+=8
+			val=#skeletons
+			cursor(xx,yy)
+			print("😐 "..val,1)
+			cursor(xx+1,yy+1)
+			print("😐 "..val,7)
+			yy+=8
+			val=#humans
+			cursor(xx,yy)
+			print("웃 "..val,1)
+			cursor(xx+1,yy+1)
+			print("웃 "..val,15)
 		--death menu
 		elseif gstate==gst_dead then
+			--death prompt
 			cursor(cam.x+32,cam.y+32)
+			print("death.",1)
+			cursor(cam.x+33,cam.y+33)
 			print("death.",7)
+			
+			--restart prompt
 			cursor(cam.x+32,cam.y+64)
+			print("❎ to retry",1)
+			cursor(cam.x+33,cam.y+65)
 			print("❎ to retry",7)
 		--victory menu
 		elseif gstate==gst_complete then
+			--victory prompt
 			cursor(cam.x+32,cam.y+16)
-			print("zombie reborn.",7)
-			cursor(cam.x+32,cam.y+24)
+			print("monster ascended.",1)
+			cursor(cam.x+33,cam.y+17)
+			print("monster ascended.",7)
+			
+			--time
+			cursor(cam.x+32,cam.y+26)
+			print("time:"..gtime,1)
+			cursor(cam.x+33,cam.y+27)
 			print("time:"..gtime,7)
-			cursor(cam.x+32,cam.y+32)
+			
+			--restart prompt
+			cursor(cam.x+32,cam.y+36)
+			print("❎ to play again",1)
+			cursor(cam.x+33,cam.y+37)
 			print("❎ to play again",7)
 		end
 	end
@@ -179,10 +293,6 @@ gst_menu=0 --menu game state
 gst_active=1 --active game state
 gst_dead=2 --dead game state
 gst_complete=3 --complete game state
-goals1={"✽fight ghosts.",
-	"웃eat humans!"}
-goals2={"◆find tombtone!",
-	"⌂find bed!"}
 
 --returns vector2 length
 function get_vec_len(x,y)
@@ -227,6 +337,15 @@ function in_table(tbl,item)
 	end
 	return false
 end
+
+--point_in_view
+function point_in_view(x,y)
+	if x>cam.x and x<cam.x+ss and
+		y>cam.y and y<cam.y+ss then
+		return true
+	end
+	return false
+end
 -->8
 --ghost
 
@@ -240,15 +359,15 @@ function make_ghost(x,y,is_player)
 	
 	--states
 	ghost.ethereal=true
-	
-	--dash
-	ghost.dashing=false
-	ghost.dashspd=3
-	ghost.dashctrail=1 --dash trail color
+	ghost.tier=1
+	ghost.ascenders={80,96}
+	ghost.targs={ghosts,wraiths}
 	
 	--trail
-	ghost.normctrail=12 --normal trail color
-	ghost.ctrail=ghost.normctrail --trail color
+	init_trail(ghost,12)
+	
+	--dash
+	init_dash(ghost,3,1,{{17},{18},{19}})
 	
 	--player or npc
 	if is_player then
@@ -260,79 +379,21 @@ function make_ghost(x,y,is_player)
 	end
 	
 	--add to list
-	add(ghosts,ghost)
+	ghost.pool=ghosts
+	add(ghost.pool,ghost)
 end
 
 --updates ghost logic
 function update_ghost(ghost)
-	--get input
+	--update input/abilities
 	ghost.update_input(ghost)
-	
-	--update dash
-	if ghost.oaction and ghost.meter>0 then
-		if not ghost.dashing then
-			--burst
-			ghost.vx+=ghost.dx*2
-			ghost.vy+=ghost.dy*2
-			
-			--if player
-			if ghost==player then
-				sfx(0)
-			end
-		end
-		ghost.dashing=true
-		ghost.invulnerable=true
-		ghost.cooldwn=ghost.maxcooldwn
-		ghost.meter-=1
-	else
-		ghost.dashing=false
-		ghost.invulnerable=false
-		if ghost.cooldwn<=0 then
-			ghost.meter=ghost.maxmeter
-			ghost.cooldwn=ghost.maxcooldwn
-		else
-			ghost.cooldwn-=1
-		end
-	end
-	
-	--update max speed
-	if ghost.dashing then
-		ghost.maxspd=ghost.dashspd
-	else
-		ghost.maxspd=ghost.normspd
-	end
-	
-	--update trail
-	ghost.ctrail=ghost.normctrail
-	if (ghost.xp==ghost.maxxp) then
-		ghost.ctrail=10
-	elseif (ghost.dashing) then
-		ghost.ctrail=ghost.dashctrail
-	end
-	add_p(ghost.x+irnd(1,6),
-		ghost.y+irnd(1,6),ghost.ctrail)
+	update_dash(ghost)
 	
 	--move and collide
 	move_and_collide(ghost)
 	
-	--check dash hitbox
-	if ghost.dashing then
-		local oghost=touching(ghost,ghosts)
-		if oghost!=nil then
-			ghost_kill(ghost,oghost)
-		end
-	end
-	
-	--check gravestone if ready
-	if ghost.xp==ghost.maxxp then
-		for y=ghost.y,ghost.y+ts,ts do
-			for x=ghost.x,ghost.x+ts,ts do
-				if mget(x/ts,y/ts)==6 then
-					ghost_ascend(ghost)
-				end
-			end
-		end
-	end
+	--check ascendance
+	check_ascend(ghost)
 end
 
 
@@ -346,87 +407,19 @@ function ghost_npc_input(ghost)
 	--update state
 	ghost.mcnt+=1
 	if (ghost.mcnt%2)==0 then
-		ghost_npc_think(ghost)
+		npc_think(ghost)
 	end
 	
 	--states
 	if ghost.mstate==st_fight then
-		--update target position
-		if ghost.targ!=nil then
-			ghost.tx=ghost.targ.x+irnd(0,64)-32
-			ghost.ty=ghost.targ.y+irnd(0,64)-32
-		end
+		update_target(ghost)
 	else
-		--update target
-		if (ghost.mcnt%30)==0 then
-			ghost.tx=ghost.x+irnd(0,64)-32
-			ghost.ty=ghost.y+irnd(0,64)-32
-		end
+		update_rand_target(ghost)
 	end
 	
 	--update input direction
 	ghost.dx=clamp(ghost.tx-ghost.x,-1,1)
 	ghost.dy=clamp(ghost.ty-ghost.y,-1,1)
-end
-
---ghost kill
-function ghost_kill(ghost,oghost)
-	--add xp
-	ghost.xp=clamp(ghost.xp+1,0,ghost.maxxp)
-	
-	--if player and ready to ascend
-	if ghost==player then
-		sfx(3)
-		if ghost.xp==ghost.maxxp then
-			player.goal=goals2[ghost.idx]
-		end
-	end
-	
-	--if other is player
-	if oghost==player then
-		gstate=gst_dead
-		sfx(4)
-	end
-	
-	--destroy other ghost
-	del(ghosts,oghost)
-end
-
---ghost ascend
-function ghost_ascend(ghost)
-	--if player
-	if ghost==player then
-		--set player to zombie
-		make_zombie(ghost.x,ghost.y,true)
-		
-		--game complete
-		--gstate=gst_complete
-	else
-		--set npc to zombie
-		make_zombie(ghost.x,ghost.y,false)
-	end
-	
-	--destroy ghost
-	del(ghosts,ghost)
-end
-
---ghost npc think
-function ghost_npc_think(ghost)
-	if (ghost.mstate==st_wander) then
-		--check near target
-		for oghost in all(ghosts) do
-		 if ghost!=oghost and get_dist(ghost.x,ghost.y,oghost.x,oghost.y)<=ghost.tradius then
-		 	ghost.targ=oghost
-		 	ghost.mstate=st_fight
-		 	ghost.oaction=true
-		 end
-		end
-	else
-		local dist = get_dist(ghost.x,ghost.y,ghost.targ.x,ghost.targ.y)
-		if ghost.targ==nil or dist>ghost.tradius then
-			ghost.mstate=st_wander
-		end
-	end
 end
 -->8
 --particles
@@ -477,11 +470,24 @@ function make_zombie(x,y,is_player)
 	--actor
 	init_actor(zombie,x,y,is_player)
 	
+	--state
+	zombie.tier=2
+	zombie.ascenders={80,96}
+	zombie.targs={humans}
+	
+	--trail
+	init_trail(zombie,3)
+	
 	--sprite
 	zombie.rsprs={33,49}
 	zombie.dsprs={34,50}
 	zombie.dgsprs={35,51}
 	zombie.sprs=zombie.rsprs
+	
+	--dash
+	init_dash(zombie,2,3,
+		{zombie.rsprs,zombie.dsprs,
+		zombie.dgsprs})
 	
 	--player or npc
 	if is_player then
@@ -493,16 +499,21 @@ function make_zombie(x,y,is_player)
 	end
 	
 	--add to list
-	add(zombies,zombie)
+	zombie.pool=zombies
+	add(zombie.pool,zombie)
 end
 
 --updates zombie logic
 function update_zombie(zombie)
 	--get input
 	zombie.update_input(zombie)
+	update_dash(zombie)
 	
 	--move and collide
 	move_and_collide(zombie)
+	
+	--check ascendance
+	check_ascend(zombie)
 end
 
 --renders the zombie
@@ -512,9 +523,18 @@ end
 
 -- npc input
 function zombie_npc_input(zombie)
-	--update target
-	zombie.tx=zombie.x+irnd(0,64)-32
-	zombie.ty=zombie.y+irnd(0,64)-32
+	--update state
+	zombie.mcnt+=1
+	if (zombie.mcnt%2)==0 then
+		npc_think(zombie)
+	end
+	
+	--states
+	if zombie.mstate==st_fight then
+		update_target(zombie)
+	else
+		update_rand_target(zombie)
+	end
 	
 	--update input direction
 	zombie.dx=clamp(zombie.tx-zombie.x,-1,1)
@@ -551,13 +571,15 @@ function init_actor(a,x,y,is_player)
 	a.flipx=false --sprite flip x
 	a.flipy=false --sprite flip y
 	
+	--tier
+	a.tier=1
+	a.targs={}
+	
 	--health
-	a.maxhp=1
-	a.hp=1
 	a.invulnerable=false
 	
 	--xp
-	a.maxxp=1
+	a.maxxp=3
 	a.xp=0
 	
 	--meter
@@ -639,20 +661,22 @@ end
 
 --checks actor collisions
 -- return: actor or nil
-function touching(a,pool)
-	for y=a.y,a.y+ts,ts do
-		for x=a.x,a.x+ts,ts do
-			for i=#pool,1,-1 do
-				local oa=pool[i]
-				local x1=oa.x
-				local x2=oa.x+ts
-				local y1=oa.y
-				local y2=oa.y+ts
-				local colliding=point_in_box(x,y,x1,y1,x2,y2)
-				if oa!=a and not
-				 oa.invulnerable and
-				 colliding then
-					return oa
+function touching(a,pools)
+	for pool in all(pools) do
+		for y=a.y,a.y+ts,ts do
+			for x=a.x,a.x+ts,ts do
+				for i=#pool,1,-1 do
+					local oa=pool[i]
+					local x1=oa.x
+					local x2=oa.x+ts
+					local y1=oa.y
+					local y2=oa.y+ts
+					local colliding=point_in_box(x,y,x1,y1,x2,y2)
+					if oa!=a and not
+					 oa.invulnerable and
+					 colliding then
+						return oa
+					end
 				end
 			end
 		end
@@ -691,7 +715,7 @@ function draw_actor(a)
 		if abs(abs(a.vx)-
 			abs(a.vy))<1 then
 			if a.dashing then
-				a.sprs={19}
+				a.sprs=a.dashdgsprs
 			else
 				a.sprs=a.dgsprs
 			end
@@ -710,7 +734,7 @@ function draw_actor(a)
 		--down sprite
 		elseif abs(a.vx)<abs(a.vy) then
 			if a.dashing then
-				a.sprs={18}
+				a.sprs=a.dashdsprs
 			else
 				a.sprs=a.dsprs
 			end
@@ -724,7 +748,7 @@ function draw_actor(a)
 		--right sprite
 		else
 			if a.dashing then
-				a.sprs={17}
+				a.sprs=a.dashrsprs
 			else
 				a.sprs=a.rsprs
 			end
@@ -743,14 +767,200 @@ function draw_actor(a)
 		1,1,a.flipx,a.flipy)
 		
 	--draw hitbox
-	--for y=ghost.y,ghost.y+ts do
-		--for x=ghost.x,ghost.x+ts do
-			--if (x==ghost.x or x==ghost.x+ts or
-				--y==ghost.y or y==ghost.y+ts) then
-				--pset(x,y,1)
-			--end
-		--end
-	--end
+	--draw_hitbox(a)
+end
+
+--init trail
+function init_trail(a,c)
+	a.normctrail=c --normal trail color
+	a.ctrail=a.normctrail --trail color
+end
+
+--update trail
+function update_trail(a)
+	a.ctrail=a.normctrail
+	if (a.xp==a.maxxp) then
+		a.ctrail=10
+	elseif (a.dashing) then
+		a.ctrail=a.dashctrail
+	end
+	add_p(a.x+irnd(1,6),
+		a.y+irnd(1,6),a.ctrail)
+end
+
+--init dash
+function init_dash(a,dspd,dc,sprs)
+	--states
+	a.dashing=false
+	a.dashspd=dspd
+	a.dashctrail=dc --dash trail color
+	a.dashdmg=1
+	
+	--sprites
+	a.dashrsprs=sprs[1]
+	a.dashdsprs=sprs[2]
+	a.dashdgsprs=sprs[3]
+end
+
+--update dash
+function update_dash(a)
+	if a.oaction and a.meter>0 then
+		if not a.dashing then
+			--burst
+			a.vx+=a.dx*2
+			a.vy+=a.dy*2
+			a.meter-=10
+			
+			--if player
+			if a==player then
+				sfx(0)
+			end
+		end
+		a.dashing=true
+		a.invulnerable=true
+		a.cooldwn=a.maxcooldwn
+		a.meter-=1
+	else
+		a.dashing=false
+		a.invulnerable=false
+		if a.cooldwn<=0 then
+			a.meter=a.maxmeter
+			a.cooldwn=a.maxcooldwn
+		elseif a.meter<a.maxmeter then
+			a.cooldwn-=1
+		end
+	end
+	
+	--update max speed
+	if a.dashing then
+		a.maxspd=a.dashspd
+		
+		--check dash collisions
+		local oa=touching(a,a.targs)
+		if oa!=nil then
+			actor_kill(a,oa)
+		end
+	else
+		a.maxspd=a.normspd
+	end
+	
+	--update trail
+	update_trail(a)
+end
+
+--ghost kill
+function actor_kill(a,oa)
+	--add xp
+	a.xp=clamp(a.xp+1,0,a.maxxp)
+	
+	--if player and ready to ascend
+	if a==player then
+		sfx(3)
+		if a.xp==a.maxxp then
+			if a.tier==1 then
+				player.goal="◆find tombtone!"
+			elseif a.tier==2 then
+				player.goal="⌂find bed!"
+			elseif a.tier==3 then
+				player.goal="★find portal!"
+			end
+		end
+	end
+	
+	--if other is player
+	if oa==player then
+		gstate=gst_dead
+		sfx(4)
+	end
+	
+	--destroy other ghost
+	del(oa.pool,oa)
+end
+
+--check ascension
+function check_ascend(a)
+	if a.xp==a.maxxp then
+		for y=a.y,a.y+ts,ts do
+			for x=a.x,a.x+ts,ts do
+				local tile=mget(x/ts,y/ts)
+				if in_table(a.ascenders,tile) then
+					ascend(a)
+					return
+				end
+			end
+		end
+	end
+end
+
+--ascend
+function ascend(a)
+	local is_player=a==player
+	
+	--to tier 2
+	if a.tier+1==2 then
+		if rnd(1)>0.5 then
+			make_zombie(a.x,a.y,is_player)
+		else
+			make_skeleton(a.x,a.y,is_player)
+		end
+	--to tier 3
+	elseif a.tier+1==3 then
+		make_human(a.x,a.y,is_player)
+	--to tier 4
+	elseif a.tier+1==4 then
+		gstate=gst_complete
+	end
+	
+	--destroy actor
+	del(a.pool,a)
+end
+
+--get nearby target
+function get_near_targ(a)
+	for pool in all(a.targs) do
+		for oa in all(pool) do
+			if (a!=oa and get_dist(a.x,
+				a.y,oa.x,oa.y)<=
+				a.tradius) then
+				return oa
+			end
+		end
+	end
+end
+
+--npc think
+function npc_think(a)
+	if (a.mstate==st_wander) then
+		--check near target
+		a.targ=get_near_targ(a)
+		if a.targ!=nil then
+			a.mstate=st_fight
+			a.oaction=true
+		end
+	else
+		local dist = get_dist(a.x,a.y,a.targ.x,a.targ.y)
+		if a.targ==nil or dist>a.tradius then
+			a.mstate=st_wander
+		end
+	end
+end
+
+--update target
+function update_target(a)
+	if a.targ!=nil then
+		a.tx=a.targ.x+irnd(0,64)-32
+		a.ty=a.targ.y+irnd(0,64)-32
+	else
+		a.mstate=st_wander
+	end
+end
+
+--update random target
+function update_rand_target(a)
+	if (a.mcnt%30)==0 then
+		a.tx=a.x+irnd(0,64)-32
+		a.ty=a.y+irnd(0,64)-32
+	end
 end
 -->8
 --wraith
@@ -762,26 +972,40 @@ function make_wraith(x,y,is_player)
 	--actor
 	init_actor(wraith,x,y,is_player)
 	
+	--states
+	wraith.ethereal=true
+	wraith.tier=1
+	wraith.ascenders={80,96}
+	wraith.targs={ghosts,wraiths}
+	
+	--trail
+	init_trail(wraith,5)
+	
+	--dash
+	init_dash(wraith,4,8,{{20},{21},{22}})
+	
+	--meter
+	wraith.maxmeter=60
+	wraith.meter=60
+	
 	--sprite
 	wraith.rsprs={4}
 	wraith.dsprs={5}
 	wraith.dgsprs={6}
 	wraith.sprs={4}
 	
-	--trail
-	wraith.ctrail=5 --trail color
-	
 	--player or npc
 	if is_player then
 		wraith.update_input=update_player_input
-		wraith.goal="✽fight wraiths."
+		wraith.goal="✽fight ghosts."
 		player=wraith
 	else
 		init_actor_npc(wraith,wraith_npc_input)
 	end
 	
 	--add to list
-	add(wraiths,wraith)
+	wraith.pool=wraiths
+	add(wraith.pool,wraith)
 end
 
 --updates wraith logic
@@ -789,12 +1013,14 @@ function update_wraith(wraith)
 	--get input
 	wraith.update_input(wraith)
 	
-	--update trail
-	add_p(wraith.x+irnd(1,6),
-		wraith.y+irnd(1,6),wraith.ctrail)
+	--update dash
+	update_dash(wraith)
 	
 	--move and collide
 	move_and_collide(wraith)
+	
+	--check ascendance
+	check_ascend(wraith)
 end
 
 --renders the wraith
@@ -804,17 +1030,22 @@ end
 
 --wraith npc input
 function wraith_npc_input(wraith)
-	--update target
-	wraith.tx=wraith.x+irnd(0,64)-32
-	wraith.ty=wraith.y+irnd(0,64)-32
+	--update state
+	wraith.mcnt+=1
+	if (wraith.mcnt%2)==0 then
+		npc_think(wraith)
+	end
+	
+	--states
+	if wraith.mstate==st_fight then
+		update_target(wraith)
+	else
+		update_rand_target(wraith)
+	end
 	
 	--update input direction
 	wraith.dx=clamp(wraith.tx-wraith.x,-1,1)
 	wraith.dy=clamp(wraith.ty-wraith.y,-1,1)
-end
-
---wraith npc think
-function wraith_npc_think(wraith)
 end
 -->8
 --spawner
@@ -823,18 +1054,26 @@ spnr.x=0 --spawner x
 spnr.y=0 --spawner y
 spnr.cnt=0 --spawn counter
 spnr.freq=30 --spawn frequency
-spnr.maxghosts=12 --max ghost spawns
+spnr.maxghosts=4 --max ghost spawns
 spnr.maxwraiths=4 --max wraith spawns
 spnr.maxzombies=4 --max zombie spawns
 spnr.maxskeletons=4 --max skeleton spawns
 spnr.maxhumans=4 --max human spawns
 
 --update spawn point
--- if not ethereal, dont
--- spawn in walls
 function update_spawnpoint(ethereal)
 	spnr.x=cam.x+irnd(0,1)*(ss+ts)-ts
 	spnr.y=cam.y+irnd(0,1)*(ss+ts)-ts
+	if spnr.x>mw then
+		spnr.x-=ss
+	elseif spnr.x<0 then
+		spnr.x+=ss
+	end
+	if spnr.y>mh then
+		spnr.x-=ss
+	elseif spnr.y<0 then
+		spnr.x+=ss
+	end
 end
 
 --update spawner
@@ -871,11 +1110,24 @@ function make_skeleton(x,y,is_player)
 	--actor
 	init_actor(skeleton,x,y,is_player)
 	
+	--state
+	skeleton.tier=2
+	skeleton.ascenders={80,96}
+	skeleton.targs={humans}
+	
+	--trail
+	init_trail(skeleton,7)
+	
 	--sprite
 	skeleton.rsprs={36,52}
 	skeleton.dsprs={37,53}
 	skeleton.dgsprs={38,54}
 	skeleton.sprs=skeleton.rsprs
+	
+	--dash
+	init_dash(skeleton,2,7,
+		{skeleton.rsprs,skeleton.dsprs,
+		skeleton.dgsprs})
 	
 	--player or npc
 	if is_player then
@@ -887,16 +1139,21 @@ function make_skeleton(x,y,is_player)
 	end
 	
 	--add to list
-	add(skeletons,skeleton)
+	skeleton.pool=skeletons
+	add(skeleton.pool,skeleton)
 end
 
 --updates zombie logic
 function update_skeleton(skeleton)
 	--get input
 	skeleton.update_input(skeleton)
+	update_dash(skeleton)
 	
 	--move and collide
 	move_and_collide(skeleton)
+	
+	--check ascendance
+	check_ascend(skeleton)
 end
 
 --renders the skeleton
@@ -906,17 +1163,22 @@ end
 
 -- npc input
 function skeleton_npc_input(skeleton)
-	--update target
-	skeleton.tx=skeleton.x+irnd(0,64)-32
-	skeleton.ty=skeleton.y+irnd(0,64)-32
+	--update state
+	skeleton.mcnt+=1
+	if (skeleton.mcnt%2)==0 then
+		npc_think(skeleton)
+	end
+	
+	--states
+	if skeleton.mstate==st_fight then
+		update_target(skeleton)
+	else
+		update_rand_target(skeleton)
+	end
 	
 	--update input direction
 	skeleton.dx=clamp(skeleton.tx-skeleton.x,-1,1)
 	skeleton.dy=clamp(skeleton.ty-skeleton.y,-1,1)
-end
-
---skeleton npc think
-function skeleton_npc_think(skeleton)
 end
 -->8
 --human
@@ -928,6 +1190,14 @@ function make_human(x,y,is_player)
 	
 	--actor
 	init_actor(human,x,y,is_player)
+	
+	--state
+	human.tier=3
+	human.ascenders={80,96}
+	human.targs={zombies,skeletons}
+	
+	--trail
+	init_trail(human,4)
 	
 	--sprite
 	if rnd(1)<0.5 then
@@ -941,6 +1211,11 @@ function make_human(x,y,is_player)
 	end
 	human.sprs=human.rsprs
 	
+	--dash
+	init_dash(human,3,4,
+		{human.rsprs,human.dsprs,
+		human.dgsprs})
+	
 	--player or npc
 	if is_player then
 		human.update_input=update_player_input
@@ -951,16 +1226,21 @@ function make_human(x,y,is_player)
 	end
 	
 	--add to list
-	add(humans,human)
+	human.pool=humans
+	add(human.pool,human)
 end
 
 --updates human logic
 function update_human(human)
 	--get input
 	human.update_input(human)
+	update_dash(human)
 	
 	--move and collide
 	move_and_collide(human)
+	
+	--check ascendance
+	check_ascend(human)
 end
 
 --renders the human
@@ -970,17 +1250,22 @@ end
 
 -- npc input
 function human_npc_input(human)
-	--update target
-	human.tx=human.x+irnd(0,64)-32
-	human.ty=human.y+irnd(0,64)-32
+	--update state
+	human.mcnt+=1
+	if (human.mcnt%2)==0 then
+		npc_think(human)
+	end
+	
+	--states
+	if human.mstate==st_fight then
+		update_target(human)
+	else
+		update_rand_target(human)
+	end
 	
 	--update input direction
 	human.dx=clamp(human.tx-human.x,-1,1)
 	human.dy=clamp(human.ty-human.y,-1,1)
-end
-
---human npc think
-function human_npc_think(human)
 end
 __gfx__
 00000000000000000000000000000000000000000000000000050000000fff4000000040004f0000222222222226622200000000000000000000000000000000
