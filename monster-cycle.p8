@@ -76,7 +76,7 @@ function _init()
 			spnr.y=irnd(0,mw)
 			make_skeleton(spnr.x,spnr.y,false)
 		end
-		for i=1,4 do
+		for i=1,6 do
 			spnr.x=irnd(0,mw)
 			spnr.y=irnd(0,mw)
 			make_human(spnr.x,spnr.y,false)
@@ -87,10 +87,10 @@ function _init()
 		spnr.y=irnd(0,mh)
 		if rnd(1)<0.5 then
 			--make_ghost(spnr.x,spnr.y,true)
-			make_zombie(spnr.x,spnr.y,true)
+			make_human(spnr.x,spnr.y,true)
 		else
 			--make_wraith(spnr.x,spnr.y,true)
-			make_zombie(spnr.x,spnr.y,true)
+			make_human(spnr.x,spnr.y,true)
 		end
 	end
 end
@@ -329,6 +329,7 @@ ss=128 --screen size
 hss=64 --half screen size
 ts=8 --tile size
 hts=4 --half tile size
+rt2o2=0.7071 --sqrt(2)/2
 st_wander=0 --wander state
 st_fight=1 --fight state
 st_flee=2 --flee state
@@ -658,11 +659,13 @@ function init_zombie_blaster(zombie)
 	zombie.pc1=11
 	zombie.pc2=3
 	zombie.paccel=0.05
-	zombie.pburst=2
+	zombie.pburst=1
+	zombie.precoil=0
 	zombie.psize=2
 	zombie.pspd=0
 	zombie.plife=30
 	zombie.pcost=30
+	zombie.pethereal=true
 end
 -->8
 --actor
@@ -672,6 +675,8 @@ function init_actor(a,x,y,is_player)
 	--dimensions
 	a.bbhw=3 --bounding box half width
 	a.bbhh=3 --bounding box half height
+	a.xfacing=1 --x facing direction
+	a.yfacing=0 --y facing direction
 	
 	--movement
 	a.x=x --x position
@@ -683,6 +688,7 @@ function init_actor(a,x,y,is_player)
 	a.normspd=2 --normal max move speed
 	a.accel=0.1 --move acceleration
 	a.ethereal=false --ethereal=no wall collisions
+	a.bounce=false --bounce on walls
 	
 	--sprite
 	a.rsprs={1} --right sprites
@@ -731,7 +737,7 @@ function init_actor_npc(a,uinput)
 	a.ty=a.y --target y position
 	a.mstate=st_wander --mental state
 	a.mcnt=irnd(0,16) --mental counter
-	a.tradius=32 --target detection radius
+	a.tradius=64 --target detection radius
 end
 
 --updates player actor input
@@ -768,7 +774,15 @@ function move_and_collide(a)
 	local ty=a.y/ts
 	if not a.ethereal and
 		in_table(walls,mget(tx,ty)) then
-		a.vx=0
+		if (a.bounce) then
+			a.vx*=-1
+			tx=(bb+a.vx)/ts
+			if in_table(walls,mget(tx,ty)) then
+				a.vx=0
+			end
+		else
+			a.vx=0
+		end
 	end
 	a.x=clamp(a.x+a.vx,0,mw-ts)
 	bb=clamp(bb+a.vx,0,mw-ts*2)
@@ -780,7 +794,15 @@ function move_and_collide(a)
 	ty=(bb+a.vy)/ts
 	if not a.ethereal and 
 		in_table(walls,mget(tx,ty)) then
-		a.vy=0
+		if (a.bounce) then
+			a.vy*=-1
+			ty=(bb+a.vx)/ts
+			if in_table(walls,mget(tx,ty)) then
+				a.vy=0
+			end
+		else
+			a.vy=0
+		end
 	end
 	a.y=clamp(a.y+a.vy,0,mh-ts)
 	
@@ -825,14 +847,7 @@ end
 function draw_hitbox(a)
 	local bbx1,bbx2=a.x-a.bbhw,a.x+a.bbhw
 	local bby1,bby2=a.y-a.bbhh,a.y+a.bbhh
-	for y=bby1,bby2 do
-		for x=bbx1,bbx2 do
-			if (x==bbx1 or x==bbx2 or
-				y==bby1 or y==bby2) then
-				pset(x,y,7)
-			end
-		end
-	end
+	rect(bbx1,bby1,bbx2,bby2,7)
 end
 
 --renders the actor
@@ -858,33 +873,43 @@ function draw_actor(a)
 			--update facing direction
 			if a.vx>0 then
 				a.flipx=false
+				a.xfacing=rt2o2
 			else
 				a.flipx=true
+				a.xfacing=-rt2o2
 			end
 			if a.vy>0 then
 				a.flipy=false
+				a.yfacing=rt2o2
 			else
 				a.flipy=true
+				a.yfacing=-rt2o2
 			end
 		--down sprite
 		elseif abs(a.vx)<abs(a.vy) then
 			a.sprs=a.dsprs
+			a.xfacing=0
 			
 			--update y facing direction
 			if a.vy<0 then
 				a.flipy=true
+				a.yfacing=-1
 			elseif a.vy>0 then
 				a.flipy=false
+				a.yfacing=1
 			end
 		--right sprite
 		else
 			a.sprs=a.rsprs
+			a.yfacing=0
 			
 			--update x facing direction
 			if a.vx<0 then
 				a.flipx=true
+				a.xfacing=-1
 			elseif a.vx>0 then
 				a.flipx=false
+				a.xfacing=1
 			end
 		end
 	end
@@ -895,8 +920,20 @@ function draw_actor(a)
 	spr(sprite,a.x-hts,a.y-hts,
 		1,1,a.flipx,a.flipy)
 	
-	--draw hitbox
+	--draw debug
 	--draw_hitbox(a)
+	--circ(a.x,a.y,a.tradius,7)
+	--line(a.x,a.y,a.x+a.xfacing*8,a.y+a.yfacing*8,7)
+end
+
+--update meter
+function update_meter(a)
+	if a.cooldwn<=0 then
+		a.meter=a.maxmeter
+		a.cooldwn=a.maxcooldwn
+	elseif a.meter<a.maxmeter then
+		a.cooldwn-=1
+	end
 end
 
 --init trail
@@ -936,6 +973,8 @@ function init_run(a,rspd)
 	--states
 	a.running=false
 	a.runspd=rspd
+	a.burststr=0
+	a.burstcost=30
 	a.contactdmg=true
 end
 
@@ -960,12 +999,7 @@ function update_dash(a)
 	else
 		a.dashing=false
 		a.invulnerable=false
-		if a.cooldwn<=0 then
-			a.meter=a.maxmeter
-			a.cooldwn=a.maxcooldwn
-		elseif a.meter<a.maxmeter then
-			a.cooldwn-=1
-		end
+		update_meter(a)
 	end
 	
 	--update max speed
@@ -986,6 +1020,13 @@ end
 function update_run(a)
 	if a.oaction and a.meter>0 then
 		if not a.running then
+			--burst
+			if a.burststr!=0 then
+				a.vx+=a.dx*a.burststr
+				a.vy+=a.dy*a.burststr
+				a.meter-=a.burstcost
+			end
+			
 			--if player
 			if a==player then
 				sfx(0)
@@ -996,12 +1037,7 @@ function update_run(a)
 		a.meter-=1
 	else
 		a.running=false
-		if a.cooldwn<=0 then
-			a.meter=a.maxmeter
-			a.cooldwn=a.maxcooldwn
-		elseif a.meter<a.maxmeter then
-			a.cooldwn-=1
-		end
+		update_meter(a)
 	end
 	
 	--update max speed
@@ -1107,8 +1143,12 @@ function npc_think(a)
 			end
 		end
 	else
-		local dist = get_dist(a.x,a.y,a.targ.x,a.targ.y)
-		if a.targ==nil or dist>a.tradius then
+		if a.targ!=nil then
+			local dist=get_dist(a.x,a.y,a.targ.x,a.targ.y)
+			if dist>a.tradius then
+				a.mstate=st_wander
+			end
+		else
 			a.mstate=st_wander
 		end
 	end
@@ -1174,6 +1214,7 @@ function init_blaster(a)
 	a.pcost=20
 	a.precoil=3
 	a.pfollow=false
+	a.pbounce=false
 	
 	--draw
 	a.pc1=7
@@ -1187,8 +1228,14 @@ end
 function update_blaster(a)
 	--check blast input + meter cost
 	if a.xactionp and a.meter>0 then
+		--update speed(add to projectile velocity)
+		a.spd=get_vec_len(a.vx,a.vy)
+		
+		--standing shot
+		update_standing_shot(a)
+		
 		--blast
-		spawn_proj(a,a.x,a.y,a.dx,a.dy,a.pburst)
+		spawn_proj(a,a.x,a.y,a.dx,a.dy,a.pburst+a.spd)
 		a.meter-=a.pcost
 		a.vx+=-a.dx*a.precoil
 		a.vy+=-a.dy*a.precoil
@@ -1200,6 +1247,156 @@ function update_blaster(a)
 		--if player
 		if a==player then
 			sfx(0)
+		end
+	end
+end
+
+--update blaster 2
+function update_blaster2(a)
+	--check blast input + meter cost
+	if a.oactionp and a.meter>0 then
+		--update speed(add to projectile velocity)
+		a.spd=get_vec_len(a.vx,a.vy)
+		
+		--standing shot
+		update_standing_shot(a)
+		
+		--blast
+		spawn_proj(a,a.x,a.y,a.dx,a.dy,a.pburst+a.spd)
+		local ds={}
+		if a.dx>0 then
+			if a.dy>0 then
+				ds={1,0,0,1} --southeast
+			elseif a.dy<0 then
+				ds={0,-1,1,0} --northeast
+			else
+				ds={rt2o2,-rt2o2,rt2o2,rt2o2} --east
+			end
+		elseif a.dx<0 then
+			if a.dy>0 then
+				ds={-1,0,0,1} --southwest
+			elseif a.dy<0 then
+				ds={0,-1,-1,0} --northwest
+			else
+				ds={-rt2o2,-rt2o2,-rt2o2,rt2o2} --west
+			end
+		else
+			if a.dy>0 then
+				ds={-rt2o2,rt2o2,rt2o2,rt2o2} --south
+			else
+				ds={-rt2o2,-rt2o2,rt2o2,-rt2o2} --north
+			end
+		end
+		spawn_proj(a,a.x,a.y,ds[1],ds[2],a.pburst+a.spd)
+		spawn_proj(a,a.x,a.y,ds[3],ds[4],a.pburst+a.spd)
+		a.meter-=a.pcost*3
+		a.vx+=-a.dx*a.precoil
+		a.vy+=-a.dy*a.precoil
+		
+		--cooldown
+		a.cooldwn=a.maxcooldwn
+		a.oactionp=false
+		
+		--if player
+		if a==player then
+			sfx(0)
+		end
+	end
+end
+
+--update item
+function update_item(a)
+	--update position
+	update_item_pos(a)
+	
+	--check blast input + meter cost
+	if a.xactionp and a.meter>0 then
+		--update speed(add to projectile velocity)
+		a.spd=get_vec_len(a.vx,a.vy)
+		
+		--blast
+		local xoff=a.itmxoff+hts
+		local yoff=a.itmyoff+hts
+		local dx=xoff/a.itmoff
+		local dy=yoff/a.itmoff
+		spawn_proj(a,a.x+xoff,
+			a.y+yoff,dx,dy,
+			a.pburst+a.spd)
+		a.meter-=a.pcost
+		a.vx+=-dx*a.precoil
+		a.vy+=-dy*a.precoil
+		
+		--cooldown
+		a.cooldwn=a.maxcooldwn
+		a.xactionp=false
+		
+		--if player
+		if a==player then
+			sfx(0)
+		end
+	end
+end
+
+--update standing shot
+function update_standing_shot(a)
+	if a.dx==0 and a.dy==0 then
+		--facing horizontal
+		if a.sprs==a.rsprs then
+			if a.flipx then
+				a.dx=-1 --left
+			else
+				a.dx=1 --right
+			end
+		--facing vertical
+		elseif a.sprs==a.dsprs then
+			if a.flipy then
+				a.dy=-1 --up
+			else
+				a.dy=1 --down
+			end
+		--facing diagonal
+		else
+			if a.flipx then
+				a.dx=-rt2o2
+			else
+				a.dx=rt2o2
+			end
+			if a.flipy then
+				a.dy=-rt2o2
+			else
+				a.dy=rt2o2
+			end
+		end
+	end
+end
+
+--update item position
+function update_item_pos(a)
+	if ((a==player and a.dx!=0 or 
+		a.dy!=0) or (a!=player)) then
+		local dx,dy=a.dx,a.dy
+		if a!=player then
+			dx=a.xfacing
+			dy=a.yfacing
+		end
+		a.itmxoff=dx*a.itmoff-hts
+		a.itmyoff=dy*a.itmoff-hts
+		if dx!=0 and dy!=0 then
+			a.itmspridx=3
+		elseif dy!=0 then
+			a.itmspridx=2
+		else
+			a.itmspridx=1
+		end
+		if dx>0 then
+			a.itmflipx=false
+		elseif dx<0 then
+			a.itmflipx=true
+		end
+		if dy>0 then
+			a.itmflipy=false
+		elseif dy<0 then
+			a.itmflipy=true
 		end
 	end
 end
@@ -1378,8 +1575,12 @@ function make_skeleton(x,y,is_player)
 	skeleton.ascenders=beds
 	skeleton.targs={humans}
 	
+	--movement
+	skeleton.bounce=true
+	
 	--trail
-	--init_trail(skeleton,7)
+	init_trail(skeleton,7)
+	skeleton.trailon=false
 	
 	--sprite
 	skeleton.rsprs={36,52}
@@ -1390,11 +1591,14 @@ function make_skeleton(x,y,is_player)
 	--run
 	init_run(skeleton,3)
 	
+	--blaster
+	init_skeleton_blaster(skeleton)
+	
 	--player or npc
 	if is_player then
 		skeleton.update_input=update_player_input
 		skeleton.goal="웃fight humans."
-		skeleton.oprompt="🅾️ run"
+		skeleton.oprompt="🅾️ throw x3"
 		skeleton.xprompt="❎ throw"
 		player=skeleton
 	else
@@ -1410,7 +1614,17 @@ end
 function update_skeleton(skeleton)
 	--get input
 	skeleton.update_input(skeleton)
-	update_run(skeleton)
+	update_blaster(skeleton)
+	update_blaster2(skeleton)
+	update_meter(skeleton)
+	
+	--contact damage
+	if skeleton.contactdmg then
+		local oa=touching(skeleton,skeleton.targs)
+		if oa!=nil then
+			actor_kill(skeleton,oa)
+		end
+	end
 	
 	--move and collide
 	move_and_collide(skeleton)
@@ -1448,6 +1662,21 @@ function skeleton_npc_input(skeleton)
 	skeleton.dy=skeleton.ty-skeleton.y
 	normalize_dir(skeleton)
 end
+
+--init skeleton blaster
+function init_skeleton_blaster(skeleton)
+	init_blaster(skeleton)
+	skeleton.pc1=7
+	skeleton.pc2=13
+	skeleton.paccel=0.05
+	skeleton.pburst=2
+	skeleton.precoil=0
+	skeleton.psize=2
+	skeleton.pspd=0
+	skeleton.plife=60
+	skeleton.pcost=30
+	skeleton.pbounce=true
+end
 -->8
 --human
 
@@ -1465,7 +1694,8 @@ function make_human(x,y,is_player)
 	human.targs={zombies,skeletons}
 	
 	--trail
-	--init_trail(human,4)
+	init_trail(human,4)
+	human.trailon=false
 	
 	--sprite
 	if rnd(1)<0.5 then
@@ -1482,13 +1712,17 @@ function make_human(x,y,is_player)
 	--run
 	init_run(human,3)
 	human.contactdmg=false
+	human.burststr=2
+	
+	--item
+	init_human_item(human)
 	
 	--player or npc
 	if is_player then
 		human.update_input=update_player_input
 		human.goal="✽kill monsters"
 		human.oprompt="🅾️ run"
-		human.xprompt="❎ use item"
+		human.xprompt="❎ shoot"
 		player=human
 	else
 		init_actor_npc(human,human_npc_input)
@@ -1504,6 +1738,7 @@ function update_human(human)
 	--get input
 	human.update_input(human)
 	update_run(human)
+	update_item(human)
 	
 	--move and collide
 	move_and_collide(human)
@@ -1516,6 +1751,7 @@ end
 function draw_human(human)
 	if player.tier!=1 then
 		draw_actor(human)
+		draw_human_item(human)
 	else
 		pset(human.x,human.y,7)
 	end
@@ -1541,6 +1777,36 @@ function human_npc_input(human)
 	human.dy=human.ty-human.y
 	normalize_dir(human)
 end
+
+--init human item
+function init_human_item(human)
+	--pistol
+	init_blaster(human)
+	human.pc1=10
+	human.pc2=5
+	human.pburst=6
+	human.precoil=1
+	human.psize=1
+	human.pspd=6
+	human.plife=15
+	human.pcost=20
+	
+	--item
+	human.itmsprs={16,32,48}
+	human.itmspridx=1
+	human.itmoff=8
+	human.itmxoff=8-hts
+	human.itmyoff=-hts
+	human.itmflipx=false
+	human.itmflipy=false
+end
+
+--draw human item
+function draw_human_item(a)
+	spr(a.itmsprs[a.itmspridx],
+		a.x+a.itmxoff,a.y+a.itmyoff,
+		1,1,a.itmflipx,a.itmflipy)
+end
 -->8
 --projectile
 
@@ -1565,6 +1831,7 @@ function spawn_proj(a,x,y,dx,dy,burst)
 	proj.accel=a.paccel --acceleration
 	proj.ethereal=a.pethereal --ethereal=no wall collisions
 	proj.follow=a.pfollow --follow owner
+	proj.bounce=a.pbounce --bounce on walls
 	
 	--draw
 	proj.c=a.pc1
