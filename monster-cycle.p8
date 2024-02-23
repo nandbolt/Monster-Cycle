@@ -83,8 +83,8 @@ function _init()
 		end
 		
 		--add player
-		spnr.x=hmw+irnd(0,128)-64
-		spnr.y=hmh+irnd(0,128)-64
+		spnr.x=irnd(0,mw)
+		spnr.y=irnd(0,mh)
 		if rnd(1)<0.5 then
 			--make_ghost(spnr.x,spnr.y,true)
 			make_zombie(spnr.x,spnr.y,true)
@@ -572,8 +572,12 @@ function make_zombie(x,y,is_player)
 	zombie.ascenders=beds
 	zombie.targs={humans}
 	
+	--movement
+	zombie.accel=0.05
+	
 	--trail
-	--init_trail(zombie,11)
+	init_trail(zombie,11)
+	zombie.trailon=false
 	
 	--sprite
 	zombie.rsprs={33,49}
@@ -582,13 +586,16 @@ function make_zombie(x,y,is_player)
 	zombie.sprs=zombie.rsprs
 	
 	--dash
-	init_run(zombie,3)
+	init_run(zombie,4)
+	
+	--blaster
+	init_zombie_blaster(zombie)
 	
 	--player or npc
 	if is_player then
 		zombie.update_input=update_player_input
 		zombie.goal="웃eat humans."
-		zombie.oprompt="🅾️ lunge"
+		zombie.oprompt="🅾️ charge"
 		zombie.xprompt="❎ spit"
 		player=zombie
 	else
@@ -605,6 +612,8 @@ function update_zombie(zombie)
 	--get input
 	zombie.update_input(zombie)
 	update_run(zombie)
+	update_blaster(zombie)
+	update_trail(zombie)
 	
 	--move and collide
 	move_and_collide(zombie)
@@ -641,6 +650,19 @@ function zombie_npc_input(zombie)
 	zombie.dx=zombie.tx-zombie.x
 	zombie.dy=zombie.ty-zombie.y
 	normalize_dir(zombie)
+end
+
+--init zombie blaster
+function init_zombie_blaster(zombie)
+	init_blaster(zombie)
+	zombie.pc1=11
+	zombie.pc2=3
+	zombie.paccel=0.05
+	zombie.pburst=2
+	zombie.psize=2
+	zombie.pspd=0
+	zombie.plife=30
+	zombie.pcost=30
 end
 -->8
 --actor
@@ -881,18 +903,22 @@ end
 function init_trail(a,c)
 	a.normctrail=c --normal trail color
 	a.ctrail=a.normctrail --trail color
+	a.trailon=true --trail on
 end
 
 --update trail
 function update_trail(a)
-	a.ctrail=a.normctrail
-	if (a.xp==a.maxxp) then
-		a.ctrail=10
-	elseif (a.dashing) then
-		a.ctrail=a.dashctrail
+	if (a.trailon or a.xp==a.maxxp) then
+		if (a.xp==a.maxxp) then
+			a.ctrail=10
+		elseif (a.dashing) then
+			a.ctrail=a.dashctrail
+		else
+			a.ctrail=a.normctrail
+		end
+		add_p(a.x+irnd(-a.bbhw,a.bbhw),
+			a.y+irnd(-a.bbhh,a.bbhh),a.ctrail)
 	end
-	add_p(a.x+irnd(-a.bbhw,a.bbhw),
-		a.y+irnd(-a.bbhh,a.bbhh),a.ctrail)
 end
 
 --init dash
