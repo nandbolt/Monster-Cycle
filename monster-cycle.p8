@@ -34,6 +34,7 @@ for i=1,128-112 do
 end
 tombs={10,11,12,47,63}
 beds={26,27,28,29,42,44,58,60}
+water={87,77,78,79}
 
 --main init
 function _init()
@@ -304,10 +305,11 @@ function _draw()
 			print("monster ascended.",7)
 			
 			--time
+			local seconds=flr(gtime/30)
 			cursor(cam.x+32,cam.y+26)
-			print("time:"..gtime,1)
+			print("time:"..seconds,1)
 			cursor(cam.x+33,cam.y+27)
-			print("time:"..gtime,7)
+			print("time:"..seconds,7)
 			
 			--restart prompt
 			cursor(cam.x+32,cam.y+36)
@@ -1070,7 +1072,7 @@ function actor_kill(a,oa)
 			elseif a.tier==2 then
 				player.goal="⌂find bed!"
 			elseif a.tier==3 then
-				player.goal="★find portal!"
+				player.goal="∧find water!"
 			end
 		end
 	end
@@ -1616,6 +1618,7 @@ function update_skeleton(skeleton)
 	skeleton.update_input(skeleton)
 	update_blaster(skeleton)
 	update_blaster2(skeleton)
+	update_trail(skeleton)
 	update_meter(skeleton)
 	
 	--contact damage
@@ -1690,7 +1693,7 @@ function make_human(x,y,is_player)
 	
 	--state
 	human.tier=3
-	human.ascenders={80,96}
+	human.ascenders=water
 	human.targs={zombies,skeletons}
 	
 	--trail
@@ -1739,6 +1742,7 @@ function update_human(human)
 	human.update_input(human)
 	update_run(human)
 	update_item(human)
+	update_trail(human)
 	
 	--move and collide
 	move_and_collide(human)
