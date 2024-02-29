@@ -7,6 +7,9 @@ __lua__
 --game state
 gstate=0
 gtime=0 --game time (steps)
+ghigh=0 --high score (steps)
+vnum="0.9"
+debug_mode=false
 
 --actor pools
 ghosts={}
@@ -36,10 +39,34 @@ tombs={10,11,12,47,63}
 beds={26,27,28,29,42,44,58,60}
 water={87,77,78,79}
 
---main init
+--main menu
+mmtimer=0
+mmx=0
+mmy=0
+mmstart=false
+mmdelay=30
+mmfade=30
+
+--delay
+delay=0
+
+--fade
+fade=0
+
+--waves
+omega=1/360
+phase=0
+amp=0
+
+--init
 function _init()
 	--not menu state
-	if gstate!=gst_menu then
+	if gstate==gst_menu then
+		mmx=irnd(0,(mw-ss)/ts)
+		mmy=irnd(0,(mh-ss)/ts)
+		music(0)
+		load_highscore()
+	else
 		--clear run
 		gtime=0
 		
@@ -56,42 +83,65 @@ function _init()
 		--clear projectiles
 		projs={}
 		
+		--reset fade
+		fade=30
+		
 		--preprocess enemies
 		for i=1,4 do
-			spnr.x=irnd(0,mw)
-			spnr.y=irnd(0,mw)
-			make_ghost(spnr.x,spnr.y,false)
-		end
-		for i=1,4 do
-			spnr.x=irnd(0,mw)
-			spnr.y=irnd(0,mw)
-			make_wraith(spnr.x,spnr.y,false)
-		end
-		for i=1,2 do
-			spnr.x=irnd(0,mw)
-			spnr.y=irnd(0,mw)
-			make_zombie(spnr.x,spnr.y,false)
-		end
-		for i=1,2 do
-			spnr.x=irnd(0,mw)
-			spnr.y=irnd(0,mw)
-			make_skeleton(spnr.x,spnr.y,false)
-		end
-		for i=1,6 do
-			spnr.x=irnd(0,mw)
-			spnr.y=irnd(0,mw)
-			make_human(spnr.x,spnr.y,false)
+			make_ghost(irnd(0,mw),
+				irnd(0,mw),false)
+			make_wraith(irnd(0,mw),
+				irnd(0,mw),false)
 		end
 		
+		--zombies
+		make_zombie(58*ts+hts, --small grave
+			50*ts+hts,false)
+		make_zombie(117*ts+hts, --large grave1
+			37*ts+hts,false)
+		make_zombie(117*ts+hts, --large grave2
+			25*ts+hts,false)
+		make_zombie(104*ts+hts, --large grave3
+			31*ts+hts,false)
+		make_zombie(33*ts+hts, --beach
+			54*ts+hts,false)
+		make_zombie(120*ts+hts, --forest
+			55*ts+hts,false)
+		make_zombie(37*ts+hts, --fountain
+			41*ts+hts,false)
+		make_zombie(92*ts+hts, --river
+			31*ts+hts,false)
+		
+		--skeletons
+		make_skeleton(58*ts+hts, --small grave
+			46*ts+hts,false)
+		make_skeleton(108*ts+hts, --large grave
+			31*ts+hts,false)
+		make_skeleton(103*ts+hts, --rocks
+			5*ts+hts,false)
+		make_skeleton(52*ts+hts, --hedges
+			12*ts+hts,false)
+		
+		--humans
+		make_human(16*ts+hts, --hotel
+			10*ts+hts,false)
+		make_human(115*ts+hts, --digger
+			10*ts+hts,false)
+		make_human(63*ts+hts, --church1
+			31*ts+hts,false)
+		make_human(73*ts+hts, --church2
+			30*ts+hts,false)
+		make_human(10*ts+hts, --beach
+			54*ts+hts,false)
+		make_human(92*ts+hts, --forest
+			58*ts+hts,false)
+		
 		--add player
-		spnr.x=irnd(0,mw)
-		spnr.y=irnd(0,mh)
+		update_spawnpoint(false)
 		if rnd(1)<0.5 then
 			make_ghost(spnr.x,spnr.y,true)
-			--make_human(spnr.x,spnr.y,true)
 		else
 			make_wraith(spnr.x,spnr.y,true)
-			--make_human(spnr.x,spnr.y,true)
 		end
 	end
 end
@@ -100,14 +150,25 @@ end
 function _update()
 	--menu game state
 	if gstate==gst_menu then
-		if btnp(5) then
-			gstate=gst_active
-			_init()
+		if mmstart then
+			if fade<=0 then
+				gstate=gst_active
+				_init()
+				music(1)
+			elseif (delay<=0) then
+				fade-=1
+			else
+				delay-=1
+			end
+			omega=lerp(omega,0,0.1)
+		elseif btnp(5) then
+			mmstart=true
+			fade=mmfade
+			delay=mmdelay
+			sfx(1)
+			music(-1)
 		end
 	else
-		--ambience
-		sfx(2)
-		
 		--update spawner
 		update_spawner()
 		
@@ -136,12 +197,22 @@ function _update()
 		--dead state
 		if gstate==gst_dead or
 			gstate==gst_complete then
-			if btnp(5) then
-				gstate=gst_active
-				_init()
+			if mmstart then
+				if fade<=0 then
+					gstate=gst_active
+					_init()
+				else
+					fade-=1
+				end
+			elseif btnp(5) then
+				mmstart=true
+				fade=mmfade
+				sfx(1)
 			end
+		--active state
 		else
 			gtime+=1
+			if (fade>0) fade-=1
 		end
 	end
 end
@@ -153,34 +224,7 @@ function _draw()
 	
 	--menu state
 	if gstate==gst_menu then
-		local xx,yy=16,24
-		cls(2)
-		
-		--title
-		cursor(xx,yy)
-		print("monster cycle",1)
-		cursor(xx+1,yy+1)
-		print("monster cycle",7)
-		
-		--game mode prompts
-		yy+=32
-		cursor(xx,yy)
-		print("press 🅾️ to play",1)
-		cursor(xx+1,yy+1)
-		print("press 🅾️ to play",7)
-		
-		--credits
-		yy+=32
-		cursor(xx,yy)
-		print("created by nandbolt(v0.5)",1)
-		cursor(xx+1,yy+1)
-		print("created by nandbolt(v0.5)",7)
-		
-		--test
-		yy+=16
-		cursor(xx,yy)
-		--print("dist:"..get_dist(10,
-		--		10,15,15),1)
+		draw_mainmenu()
 	else
 		--draw tiles
 		map(0,0,0,0,mw,mh)
@@ -208,6 +252,14 @@ function _draw()
 			print(player.goal,1)
 			cursor(xx+1,yy+1)
 			print(player.goal,7)
+			
+			--highscore
+			local hseconds=flr(ghigh/30)
+			if (ghigh==0) hseconds="none"
+			cursor(xx+hss+22,yy)
+			print("high:"..hseconds,1)
+			cursor(xx+hss+23,yy+1)
+			print("high:"..hseconds,10)
 			
 			--timer
 			yy+=8
@@ -280,7 +332,7 @@ function _draw()
 			print("웃 "..val,15)
 			
 			--controls
-			yy+=32
+			yy+=34
 			cursor(xx,yy)
 			print(player.oprompt,1)
 			cursor(xx+1,yy+1)
@@ -292,42 +344,101 @@ function _draw()
 			print(player.xprompt,14)
 			
 			--debug
-			yy+=8
-			cursor(xx,yy)
+			--yy+=8
+			--cursor(xx,yy)
 			--print("fps:"..stat(7),1)
 		--death menu
 		elseif gstate==gst_dead then
+			local xx,yy=cam.x+32,cam.y+32
+			
 			--death prompt
-			cursor(cam.x+32,cam.y+32)
-			print("death.",1)
-			cursor(cam.x+33,cam.y+33)
-			print("death.",7)
+			cursor(xx,yy+1)
+			print("more than death.",1)
+			cursor(xx+2,yy+1)
+			print("more than death.",1)
+			cursor(xx+1,yy)
+			print("more than death.",1)
+			cursor(xx+1,yy+2)
+			print("more than death.",1)
+			cursor(xx+1,yy+1)
+			print("more than death.",7)
 			
 			--restart prompt
-			cursor(cam.x+32,cam.y+64)
+			yy+=32
+			cursor(xx,yy+1)
 			print("❎ to retry",1)
-			cursor(cam.x+33,cam.y+65)
+			cursor(xx+2,yy+1)
+			print("❎ to retry",1)
+			cursor(xx+1,yy)
+			print("❎ to retry",1)
+			cursor(xx+1,yy+2)
+			print("❎ to retry",1)
+			cursor(xx+1,yy+1)
 			print("❎ to retry",7)
 		--victory menu
 		elseif gstate==gst_complete then
+			local xx,yy=cam.x+32,cam.y+16
+			mmtimer+=1
+			
 			--victory prompt
-			cursor(cam.x+32,cam.y+16)
-			print("monster ascended.",1)
-			cursor(cam.x+33,cam.y+17)
+			local omegat=omega*mmtimer
+			phase=0.22
+			amp=32
+			local val=sin(mmtimer/60)
+			local cols={0,1,2,8}
+			cursor(xx,yy+1)
+			print("monster ascended.",cols[flr(val*2.4+2.5)])
+			cursor(xx+2,yy+1)
+			print("monster ascended.",cols[flr(val*1.4+1.5)])
+			cursor(xx+1,yy+2)
+			print("monster ascended.",cols[flr(val*2.4+2.5)])
+			cursor(xx+1,yy)
+			print("monster ascended.",cols[flr(val*1.4+1.5)])
+			cursor(xx+1,yy+1)
 			print("monster ascended.",7)
 			
 			--time
+			yy+=40
 			local seconds=flr(gtime/30)
-			cursor(cam.x+32,cam.y+26)
-			print("time:"..seconds,1)
-			cursor(cam.x+33,cam.y+27)
-			print("time:"..seconds,7)
+			local c,nh=7,""
+			if (gtime==ghigh) then
+				c=10
+				nh="(new high!)"
+			end
+			cursor(xx,yy+1)
+			print("time:"..seconds..nh,1)
+			cursor(xx+2,yy+1)
+			print("time:"..seconds..nh,1)
+			cursor(xx+1,yy)
+			print("time:"..seconds..nh,1)
+			cursor(xx+1,yy+2)
+			print("time:"..seconds..nh,1)
+			cursor(xx+1,yy+1)
+			print("time:"..seconds..nh,c)
 			
 			--restart prompt
-			cursor(cam.x+32,cam.y+36)
+			yy+=40
+			cursor(xx,yy+1)
 			print("❎ to play again",1)
-			cursor(cam.x+33,cam.y+37)
+			cursor(xx+2,yy)
+			print("❎ to play again",1)
+			cursor(xx+1,yy)
+			print("❎ to play again",1)
+			cursor(xx+1,yy+2)
+			print("❎ to play again",1)
+			cursor(xx+1,yy+1)
 			print("❎ to play again",7)
+		end
+		
+		--fade
+		if gstate==gst_active then
+			if fade>0 then
+				circfill(cam.x+hss,cam.y+hss,(hss+28)*(fade/30),1)
+			end
+		else
+			if mmstart then
+				circfill(cam.x+hss,cam.y+hss,(hss+28)*(1-(fade/30)),1)
+			end
 		end
 	end
 end
@@ -396,7 +507,7 @@ function in_table(tbl,item)
 	return false
 end
 
---point_in_view
+--point in view
 function point_in_view(x,y)
 	if x>cam.x and x<cam.x+ss and
 		y>cam.y and y<cam.y+ss then
@@ -468,11 +579,14 @@ function make_ghost(x,y,is_player)
 	if is_player then
 		ghost.update_input=update_player_input
 		ghost.goal="✽fight ghosts."
-		ghost.oprompt="🅾️ dash"
-		ghost.xprompt="❎ shoot"
+		ghost.oprompt="🅾️/z dash"
+		ghost.xprompt="❎/x shoot"
 		player=ghost
 	else
-		init_actor_npc(ghost,ghost_npc_input)
+		init_actor_npc(ghost)
+		ghost.wander=ghost_wander
+		ghost.fight=ghost_fight
+		ghost.flee=ghost_flee
 	end
 	
 	--add to list
@@ -503,27 +617,6 @@ function draw_ghost(ghost)
 	end
 end
 
---ghost npc input
-function ghost_npc_input(ghost)
-	--update state
-	ghost.mcnt+=1
-	if (ghost.mcnt%2)==0 then
-		npc_think(ghost)
-	end
-	
-	--states
-	if ghost.mstate==st_fight then
-		update_target(ghost)
-	else
-		update_rand_target(ghost)
-	end
-	
-	--update input direction
-	ghost.dx=ghost.tx-ghost.x
-	ghost.dy=ghost.ty-ghost.y
-	normalize_dir(ghost)
-end
-
 --init ghost blaster
 function init_ghost_blaster(ghost)
 	init_blaster(ghost)
@@ -532,6 +625,29 @@ function init_ghost_blaster(ghost)
 	ghost.paccel=0.05
 	ghost.pburst=1
 	ghost.psize=1
+	ghost.pethereal=true
+end
+
+--enter ghost wander state
+function ghost_wander(ghost)
+	enter_wander_state(ghost)
+end
+
+--enter ghost fight state
+function ghost_fight(ghost)
+	enter_fight_state(ghost)
+	
+	--choose action
+	if rnd(1)<0.5 then
+		ghost.oaction=true
+	else
+		ghost.xactionp=true
+	end
+end
+
+--enter ghost flee state
+function ghost_flee(ghost)
+	enter_flee_state(ghost)
 end
 -->8
 --particles
@@ -606,15 +722,21 @@ function make_zombie(x,y,is_player)
 	--blaster
 	init_zombie_blaster(zombie)
 	
+	--xp
+	zombie.maxxp=6
+	
 	--player or npc
 	if is_player then
 		zombie.update_input=update_player_input
 		zombie.goal="웃eat humans."
-		zombie.oprompt="🅾️ charge"
-		zombie.xprompt="❎ spit"
+		zombie.oprompt="🅾️/z charge"
+		zombie.xprompt="❎/x spit"
 		player=zombie
 	else
-		init_actor_npc(zombie,zombie_npc_input)
+		init_actor_npc(zombie)
+		zombie.wander=zombie_wander
+		zombie.fight=zombie_fight
+		zombie.flee=zombie_flee
 	end
 	
 	--add to list
@@ -641,37 +763,14 @@ end
 function draw_zombie(zombie)
 	if player.tier!=1 then
 		draw_actor(zombie)
-	else
-		pset(zombie.x,zombie.y,7)
 	end
-end
-
--- npc input
-function zombie_npc_input(zombie)
-	--update state
-	zombie.mcnt+=1
-	if (zombie.mcnt%2)==0 then
-		npc_think(zombie)
-	end
-	
-	--states
-	if zombie.mstate==st_fight then
-		update_target(zombie)
-	else
-		update_rand_target(zombie)
-	end
-	
-	--update input direction
-	zombie.dx=zombie.tx-zombie.x
-	zombie.dy=zombie.ty-zombie.y
-	normalize_dir(zombie)
 end
 
 --init zombie blaster
 function init_zombie_blaster(zombie)
 	init_blaster(zombie)
-	zombie.pc1=11
-	zombie.pc2=3
+	zombie.pc1=3
+	zombie.pc2=11
 	zombie.paccel=0.05
 	zombie.pburst=1
 	zombie.precoil=0
@@ -680,6 +779,29 @@ function init_zombie_blaster(zombie)
 	zombie.plife=30
 	zombie.pcost=30
 	zombie.pethereal=true
+	zombie.pdraw=draw_zombie_proj
+end
+
+--enter zombie wander state
+function zombie_wander(zombie)
+	enter_wander_state(zombie)
+end
+
+--enter zombie fight state
+function zombie_fight(zombie)
+	enter_fight_state(zombie)
+	
+	--choose action
+	if rnd(1)<0.5 then
+		zombie.oaction=true
+	else
+		zombie.xactionp=true
+	end
+end
+
+--enter zombie flee state
+function zombie_flee(zombie)
+	enter_flee_state(zombie)
 end
 -->8
 --actor
@@ -723,7 +845,7 @@ function init_actor(a,x,y,is_player)
 	a.invulnerable=false
 	
 	--xp
-	a.maxxp=3
+	a.maxxp=4
 	a.xp=0
 	
 	--meter
@@ -744,14 +866,20 @@ function init_actor(a,x,y,is_player)
 end
 
 --inits vars for npc actor
-function init_actor_npc(a,uinput)
-	a.update_input=uinput
+function init_actor_npc(a)
+	a.update_input=npc_input
 	a.targ=nil --target
 	a.tx=a.x --target x position
 	a.ty=a.y --target y position
 	a.mstate=st_wander --mental state
-	a.mcnt=irnd(0,16) --mental counter
-	a.tradius=64 --target detection radius
+	a.mfreq=30 --think frequency
+	a.mcnt=irnd(0,29) --mental counter
+	a.tradius=48 --target detection radius
+	
+	--states
+	a.wander=enter_wander_state
+	a.fight=enter_fight_state
+	a.flee=enter_flee_state
 end
 
 --updates player actor input
@@ -774,13 +902,23 @@ end
 --collisions
 function move_and_collide(a)
 	local collision=false
+	local maxspd=a.maxspd
+	if not a.ethereal and
+		in_table(water,mget(a.x/ts,a.y/ts)) then
+		maxspd*=0.25
+		if a.dx!=0 or a.dy!=0 then
+			add_p(a.x-clamp(a.vx+rnd(4)-2,
+				-8,8),a.y-clamp(a.vy+rnd(4)-2,
+				-8,8),1)
+		end
+	end
 	
 	--update velocity
 	a.vx=lerp(a.vx,
-		a.dx*a.maxspd,
+		a.dx*maxspd,
 		a.accel)
 	a.vy=lerp(a.vy,
-		a.dy*a.maxspd,
+		a.dy*maxspd,
 		a.accel)
 	
 	--handle x collision
@@ -802,8 +940,7 @@ function move_and_collide(a)
 			a.vx=0
 		end
 	end
-	a.x=clamp(a.x+a.vx,0,mw-ts)
-	bb=clamp(bb+a.vx,0,mw-ts*2)
+	a.x=clamp(a.x+a.vx,0,mw-hts)
 	
 	--handle y collision
 	bb=a.y-a.bbhh
@@ -824,7 +961,7 @@ function move_and_collide(a)
 			a.vy=0
 		end
 	end
-	a.y=clamp(a.y+a.vy,0,mh-ts)
+	a.y=clamp(a.y+a.vy,0,mh-hts)
 	
 	--update speed
 	a.spd=get_vec_len(a.vx,a.vy)
@@ -942,10 +1079,8 @@ function draw_actor(a)
 	spr(sprite,a.x-hts,a.y-hts,
 		1,1,a.flipx,a.flipy)
 	
-	--draw debug
-	--draw_hitbox(a)
-	--circ(a.x,a.y,a.tradius,7)
-	--line(a.x,a.y,a.x+a.xfacing*8,a.y+a.yfacing*8,7)
+	--debug
+	draw_debug(a)
 end
 
 --update meter
@@ -1117,6 +1252,7 @@ end
 --ascend
 function ascend(a)
 	local is_player=a==player
+	if (is_player) sfx(7)
 	
 	--to tier 2
 	if a.tier+1==2 then
@@ -1130,7 +1266,15 @@ function ascend(a)
 		make_human(a.x,a.y,is_player)
 	--to tier 4
 	elseif a.tier+1==4 then
-		gstate=gst_complete
+		if is_player then
+			--victory
+			gstate=gst_complete
+			mmstart=false
+			if gtime<ghigh or ghigh==0 then
+				save_highscore(gtime)
+				sfx(8)
+			end
+		end
 	end
 	
 	--destroy actor
@@ -1141,62 +1285,132 @@ end
 function get_near_targ(a)
 	for pool in all(a.targs) do
 		for oa in all(pool) do
-			if (a!=oa and get_dist(a.x,
-				a.y,oa.x,oa.y)<=
-				a.tradius) then
-				return oa
+			if a!=oa then
+				local size=a.tradius
+				if point_in_box(oa.x,oa.y,
+					a.x-size,a.y-size,
+					a.x+size,a.y+size) then
+					return oa
+				end
 			end
 		end
 	end
 	return nil
 end
 
+--enter wander state
+function enter_wander_state(a)
+	a.mstate=st_wander
+	a.oaction=false
+	a.xactionp=false
+end
+
+--enter fight state
+function enter_fight_state(a)
+	a.mstate=st_fight
+end
+
+--enter flee state
+function enter_flee_state(a)
+	a.mstate=st_flee
+end
+
 --npc think
 function npc_think(a)
-	if (a.mstate==st_wander) then
-		--check near target
-		a.targ=get_near_targ(a)
+	a.targ=get_near_targ(a)
+	if a.mstate==st_wander then
+		--wander state
 		if a.targ!=nil then
-			a.mstate=st_fight
-			if rnd(1)<0.5 then
-				a.oaction=true
+			if a.meter>0 then
+				--wander->fight
+				a.fight(a)
 			else
-				a.xactionp=true
-			end
-		end
-	else
-		if a.targ!=nil then
-			local dist=get_dist(a.x,a.y,a.targ.x,a.targ.y)
-			if dist>a.tradius then
-				a.mstate=st_wander
+				--wander->flee
+				a.flee(a)
 			end
 		else
-			a.mstate=st_wander
+			update_rand_targ(a)
+		end
+	else
+		--fight/flee state
+		if a.targ==nil then
+			--fight/flee->wander
+			a.wander(a)
+		elseif a.mstate==a.flee then
+			--flee state
+			if a.meter>0 then
+				--flee->fight
+				a.fight(a)
+			end
+		else
+			--fight state
+			if a.meter<=0 then
+				--fight->flee
+				a.flee(a)
+			else
+				--stay in fight
+				a.fight(a)
+			end
 		end
 	end
 end
 
 --update target
-function update_target(a)
+function update_targ(a)
 	if a.targ!=nil then
-		a.tx=a.targ.x+irnd(0,64)-32
-		a.ty=a.targ.y+irnd(0,64)-32
-	else
-		a.mstate=st_wander
+		a.tx=a.targ.x
+		a.ty=a.targ.y
 	end
 end
 
 --update random target
-function update_rand_target(a)
-	if (a.mcnt%30)==0 then
-		a.tx=a.x+irnd(0,64)-32
-		a.ty=a.y+irnd(0,64)-32
+function update_rand_targ(a)
+	a.tx=a.x+irnd(0,a.tradius)-a.tradius*0.5
+	a.ty=a.y+irnd(0,a.tradius)-a.tradius*0.5
+end
+
+--follow target
+function follow_targ(a)
+	a.dx=a.tx-a.x
+	a.dy=a.ty-a.y
+	
+	--add follow spread
+	a.dx+=rnd(1)*32-16
+	a.dy+=rnd(1)*32-16
+	normalize_dir(a)
+end
+
+--flee target
+function flee_targ(a)
+	a.dx=a.x-a.tx
+	a.dy=a.y-a.ty
+	normalize_dir(a)
+end
+
+--npc input
+function npc_input(a)
+	--update state
+	if time_to_think(a) then
+		npc_think(a)
+	end
+	
+	--state logic
+	if a.mstate==st_fight then
+		update_targ(a)
+		follow_targ(a)
+	elseif a.mstate==st_flee then
+		update_targ(a)
+		flee_targ(a)
+	else
+		follow_targ(a)
 	end
 end
 
 --descend
 function descend(a)
 	local is_player=a==player
+	if (is_player) sfx(4)
+	local c=1
 	
 	--to tier 2
 	if a.tier-1==2 then
@@ -1205,6 +1419,7 @@ function descend(a)
 		else
 			make_skeleton(a.x,a.y,is_player)
 		end
+		c=8
 	--to tier 1
 	elseif a.tier-1==1 then
 		if rnd(1)>0.5 then
@@ -1212,12 +1427,20 @@ function descend(a)
 		else
 			make_wraith(a.x,a.y,is_player)
 		end
+		c=5
 	--to tier 0
 	elseif a.tier-1==0 then
 		if is_player then
 			gstate=gst_dead
-			sfx(4)
+			mmstart=false
+			--sfx(4)
 		end
+	end
+	
+	--blood
+	for i=1,8 do
+		add_p(a.x+rnd(1)*12-6,
+			a.y+rnd(1)*12-6,c)
 	end
 	
 	--destroy actor
@@ -1238,6 +1461,9 @@ function init_blaster(a)
 	a.pfollow=false
 	a.pbounce=false
 	a.pfragile=false
+	a.pdraw=draw_ghost_proj
+	a.psprs={}
+	a.pspridx=1
 	
 	--draw
 	a.pc1=7
@@ -1452,6 +1678,60 @@ function update_item_pos(a)
 		end
 	end
 end
+
+--time to think
+function time_to_think(a)
+	a.mcnt+=1
+	return (a.mcnt%a.mfreq)==0
+end
+
+--draw debug
+function draw_debug(a)
+	if debug_mode then
+		--bounding box
+		draw_hitbox(a)
+		
+		--facing direction
+		line(a.x,a.y,a.x+a.xfacing*8,a.y+a.yfacing*8,7)
+		if a!=player then
+			local c=7
+			if a.mstate==st_fight then 
+				c=10
+			elseif a.mstate==st_flee then
+				c=14
+			else
+				c=7
+			end
+			
+			--target square
+			rect(a.x-a.tradius,a.y-a.tradius,
+				a.x+a.tradius,a.y+a.tradius,7)
+			
+			--target vector
+			line(a.x,a.y,a.tx,a.ty,c)
+			
+			--state circle
+			circfill(a.x,a.y,1,c)
+		else
+			a.tradius=48
+			local targ=get_near_targ(a)
+			cursor(a.x-8,a.y-12)
+			
+			--target square
+			rect(a.x-a.tradius,a.y-a.tradius,
+				a.x+a.tradius,a.y+a.tradius,7)
+			
+			--target message
+			if targ==nil then
+				print("no target nearby")
+			else
+				print("target near!")
+				--target vector
+				line(a.x,a.y,targ.x,targ.y,9)
+			end
+		end
+	end
+end
 -->8
 --wraith
 
@@ -1491,11 +1771,14 @@ function make_wraith(x,y,is_player)
 	if is_player then
 		wraith.update_input=update_player_input
 		wraith.goal="✽fight ghosts."
-		wraith.oprompt="🅾️ dash"
-		wraith.xprompt="❎ shoot"
+		wraith.oprompt="🅾️/z dash"
+		wraith.xprompt="❎/x shoot"
 		player=wraith
 	else
-		init_actor_npc(wraith,wraith_npc_input)
+		init_actor_npc(wraith)
+		wraith.wander=wraith_wander
+		wraith.fight=wraith_fight
+		wraith.flee=wraith_flee
 	end
 	
 	--add to list
@@ -1525,27 +1808,6 @@ function draw_wraith(wraith)
 	end
 end
 
---wraith npc input
-function wraith_npc_input(wraith)
-	--update state
-	wraith.mcnt+=1
-	if (wraith.mcnt%2)==0 then
-		npc_think(wraith)
-	end
-	
-	--states
-	if wraith.mstate==st_fight then
-		update_target(wraith)
-	else
-		update_rand_target(wraith)
-	end
-	
-	--update input direction
-	wraith.dx=wraith.tx-wraith.x
-	wraith.dy=wraith.ty-wraith.y
-	normalize_dir(wraith)
-end
-
 --init wraith blaster
 function init_wraith_blaster(wraith)
 	init_blaster(wraith)
@@ -1558,6 +1820,29 @@ function init_wraith_blaster(wraith)
 	wraith.plife=90
 	wraith.pfollow=true
 	wraith.pcost=30
+	wraith.pethereal=true
+end
+
+--enter wraith wander state
+function wraith_wander(wraith)
+	enter_wander_state(wraith)
+end
+
+--enter wraith fight state
+function wraith_fight(wraith)
+	enter_fight_state(wraith)
+	
+	--choose action
+	if rnd(1)<0.5 then
+		wraith.oaction=true
+	else
+		wraith.xactionp=true
+	end
+end
+
+--enter wraith flee state
+function wraith_flee(wraith)
+	enter_flee_state(wraith)
 end
 -->8
 --spawner
@@ -1566,25 +1851,39 @@ spnr.x=0 --spawner x
 spnr.y=0 --spawner y
 spnr.cnt=0 --spawn counter
 spnr.freq=30 --spawn frequency
-spnr.maxghosts=4 --max ghost spawns
+spnr.maxghosts=6 --max ghost spawns
 spnr.maxwraiths=4 --max wraith spawns
-spnr.maxzombies=4 --max zombie spawns
-spnr.maxskeletons=4 --max skeleton spawns
-spnr.maxhumans=4 --max human spawns
+spnr.maxzombies=12 --max zombie spawns
+spnr.maxskeletons=8 --max skeleton spawns
+spnr.maxhumans=8 --max human spawns
 
 --update spawn point
 function update_spawnpoint(ethereal)
-	spnr.x=cam.x+irnd(0,1)*(ss+ts)-ts
-	spnr.y=cam.y+irnd(0,1)*(ss+ts)-ts
-	if spnr.x>mw then
-		spnr.x-=ss
-	elseif spnr.x<0 then
-		spnr.x+=ss
-	end
-	if spnr.y>mh then
-		spnr.x-=ss
-	elseif spnr.y<0 then
-		spnr.x+=ss
+	--choose tile
+	local tx,ty=irnd(0,mw/ts-1),irnd(0,mh/ts-1)
+	local iter=0
+	
+	--check tiles
+	while (iter<100) do
+		if (tx>mw/ts-1) then
+			--out of bounds
+			tx=0
+		elseif (point_in_view(tx*ts+hts,
+			ty*ts+hts)) then
+			--in view
+			tx+=1
+		elseif (not ethereal and 
+			in_table(walls,
+			mget(tx,ty))) then
+			--in wall
+			tx+=1
+		else
+			--spawn good!
+			spnr.x=tx*ts+hts
+			spnr.y=ty*ts+hts
+			break
+		end
+		iter+=1
 	end
 end
 
@@ -1646,15 +1945,21 @@ function make_skeleton(x,y,is_player)
 	--blaster
 	init_skeleton_blaster(skeleton)
 	
+	--xp
+	skeleton.maxxp=6
+	
 	--player or npc
 	if is_player then
 		skeleton.update_input=update_player_input
 		skeleton.goal="웃fight humans."
-		skeleton.oprompt="🅾️ throw x3"
-		skeleton.xprompt="❎ throw"
+		skeleton.oprompt="🅾️/z throw x3"
+		skeleton.xprompt="❎/x throw"
 		player=skeleton
 	else
-		init_actor_npc(skeleton,skeleton_npc_input)
+		init_actor_npc(skeleton)
+		skeleton.wander=skeleton_wander
+		skeleton.fight=skeleton_fight
+		skeleton.flee=skeleton_flee
 	end
 	
 	--add to list
@@ -1671,14 +1976,6 @@ function update_skeleton(skeleton)
 	update_trail(skeleton)
 	update_meter(skeleton)
 	
-	--contact damage
-	if skeleton.contactdmg then
-		local oa=touching(skeleton,skeleton.targs)
-		if oa!=nil then
-			actor_kill(skeleton,oa)
-		end
-	end
-	
 	--move and collide
 	move_and_collide(skeleton)
 	
@@ -1690,30 +1987,7 @@ end
 function draw_skeleton(skeleton)
 	if player.tier!=1 then
 		draw_actor(skeleton)
-	else
-		pset(skeleton.x,skeleton.y,7)
 	end
-end
-
--- npc input
-function skeleton_npc_input(skeleton)
-	--update state
-	skeleton.mcnt+=1
-	if (skeleton.mcnt%2)==0 then
-		npc_think(skeleton)
-	end
-	
-	--states
-	if skeleton.mstate==st_fight then
-		update_target(skeleton)
-	else
-		update_rand_target(skeleton)
-	end
-	
-	--update input direction
-	skeleton.dx=skeleton.tx-skeleton.x
-	skeleton.dy=skeleton.ty-skeleton.y
-	normalize_dir(skeleton)
 end
 
 --init skeleton blaster
@@ -1729,6 +2003,30 @@ function init_skeleton_blaster(skeleton)
 	skeleton.plife=60
 	skeleton.pcost=30
 	skeleton.pbounce=true
+	skeleton.pdraw=draw_skeleton_proj
+	skeleton.psprs={30,46,31,46}
+end
+
+--enter skeleton wander state
+function skeleton_wander(skeleton)
+	enter_wander_state(skeleton)
+end
+
+--enter skeleton fight state
+function skeleton_fight(skeleton)
+	enter_fight_state(skeleton)
+	
+	--choose action
+	if rnd(1)<0.5 then
+		skeleton.oaction=true
+	else
+		skeleton.xactionp=true
+	end
+end
+
+--enter skeleton flee state
+function skeleton_flee(skeleton)
+	enter_flee_state(skeleton)
 end
 -->8
 --human
@@ -1770,15 +2068,21 @@ function make_human(x,y,is_player)
 	--item
 	init_human_item(human)
 	
+	--xp
+	human.maxxp=10
+	
 	--player or npc
 	if is_player then
 		human.update_input=update_player_input
 		human.goal="✽kill monsters"
-		human.oprompt="🅾️ run"
-		human.xprompt="❎ item"
+		human.oprompt="🅾️/z run"
+		human.xprompt="❎/x item"
 		player=human
 	else
-		init_actor_npc(human,human_npc_input)
+		init_actor_npc(human)
+		human.wander=human_wander
+		human.fight=human_fight
+		human.flee=human_flee
 	end
 	
 	--add to list
@@ -1806,30 +2110,7 @@ function draw_human(human)
 	if player.tier!=1 then
 		draw_actor(human)
 		draw_human_item(human)
-	else
-		pset(human.x,human.y,7)
 	end
-end
-
--- npc input
-function human_npc_input(human)
-	--update state
-	human.mcnt+=1
-	if (human.mcnt%2)==0 then
-		npc_think(human)
-	end
-	
-	--states
-	if human.mstate==st_fight then
-		update_target(human)
-	else
-		update_rand_target(human)
-	end
-	
-	--update input direction
-	human.dx=human.tx-human.x
-	human.dy=human.ty-human.y
-	normalize_dir(human)
 end
 
 --init human item
@@ -1880,6 +2161,28 @@ function draw_human_item(a)
 		--draw_hitbox(a.melee)
 	--end
 end
+
+--enter human wander state
+function human_wander(human)
+	enter_wander_state(human)
+end
+
+--enter human fight state
+function human_fight(human)
+	enter_fight_state(human)
+	
+	--choose action
+	if human.itmidx==1 then
+		human.xactionp=true
+	else
+		human.oaction=true
+	end
+end
+
+--enter human flee state
+function human_flee(human)
+	enter_flee_state(human)
+end
 -->8
 --projectile
 
@@ -1898,7 +2201,8 @@ function spawn_proj(a,x,y,dx,dy,burst)
 	proj.y=y --y position
 	proj.vx=dx*burst --x velocity
 	proj.vy=dy*burst --y velocity
-	proj.spd=0 --speed (for queries)
+	proj.spd=get_vec_len(proj.vx,
+		proj.vy) --speed (for queries)
 	proj.maxspd=a.pspd --current max move speed
 	proj.normspd=a.pspd --normal max move speed
 	proj.accel=a.paccel --acceleration
@@ -1909,7 +2213,9 @@ function spawn_proj(a,x,y,dx,dy,burst)
 	
 	--draw
 	proj.c=a.pc1
-	proj.draw=draw_ghost_proj
+	proj.draw=a.pdraw
+	proj.sprs=a.psprs
+	proj.spridx=1
 	
 	--lifetime
 	proj.life=a.plife
@@ -1978,6 +2284,155 @@ end
 function draw_ghost_proj(p)
 	circfill(p.x,p.y,p.bbhw+1,p.ctrail)
 	circfill(p.x,p.y,p.bbhw,p.c)
+end
+
+--draw zombie projectile
+function draw_zombie_proj(p)
+	local rad=p.bbhw*(p.life/30)
+	circfill(p.x,p.y+2,rad+1,p.c)
+	circfill(p.x,p.y+2,rad,p.ctrail)
+	circfill(p.x+2,p.y-2,rad+1,p.c)
+	circfill(p.x+2,p.y-2,rad,p.ctrail)
+	circfill(p.x-2,p.y-2,rad+1,p.c)
+	circfill(p.x-2,p.y-2,rad,p.ctrail)
+end
+
+--draw skeleton projectile
+function draw_skeleton_proj(p)
+	p.spridx+=p.spd
+	local spridx=flr(p.spridx-1)%3+1
+	spr(p.sprs[spridx],p.x-hts,p.y-hts)
+end
+-->8
+--main menu
+
+--draw main menu
+function draw_mainmenu()
+	local xx,yy=0,0
+	
+	--tiles
+	map(mmx,mmy,0,0,mw,mh)
+	
+	--gridlines
+	if false then
+		line(hss,0,hss,ss)
+		line(hss/2,0,hss/2,ss)
+		line(hss*3/2,0,hss*3/2,ss)
+		line(0,hss,ss,hss)
+		line(0,hss/2,ss,hss/2)
+		line(0,hss*3/2,ss,hss*3/2)
+	end
+	
+	--timer
+	mmtimer+=1
+	
+	--monster cycle
+	local omegat=omega*mmtimer
+	phase=0.22
+	amp=32
+	circ(hss,hss,amp+1,1)
+	circ(hss,hss,amp-1,1)
+	circ(hss,hss,amp,7)
+	xx=hss-amp*cos(omegat+phase)
+	yy=hss+amp*sin(omegat+phase)
+	spr(2,xx-hts,yy-hts) --ghost
+	phase+=0.06
+	xx=hss-amp*cos(omegat+phase)
+	yy=hss+amp*sin(omegat+phase)
+	spr(5,xx-hts,yy-hts) --wraith
+	phase=0.55
+	xx=hss-amp*cos(omegat+phase)
+	yy=hss+amp*sin(omegat+phase)
+	spr(34,xx-hts,yy-hts) --zombie
+	phase+=0.06
+	xx=hss-amp*cos(omegat+phase)
+	yy=hss+amp*sin(omegat+phase)
+	spr(37,xx-hts,yy-hts) --skelly
+	phase=0.88
+	xx=hss-amp*cos(omegat+phase)
+	yy=hss+amp*sin(omegat+phase)
+	spr(8,xx-hts,yy-hts) --human1
+	phase+=0.06
+	xx=hss-amp*cos(omegat+phase)
+	yy=hss+amp*sin(omegat+phase)
+	spr(40,xx-hts,yy-hts) --human2
+	
+	phase=0.415
+	xx=hss-amp*cos(omegat+phase)
+	yy=hss+amp*sin(omegat+phase)
+	circfill(xx,yy,2,1)
+	circfill(xx,yy,1,10)
+	phase=0.745
+	xx=hss-amp*cos(omegat+phase)
+	yy=hss+amp*sin(omegat+phase)
+	circfill(xx,yy,2,1)
+	circfill(xx,yy,1,10)
+	phase=0.075
+	xx=hss-amp*cos(omegat+phase)
+	yy=hss+amp*sin(omegat+phase)
+	circfill(xx,yy,2,1)
+	circfill(xx,yy,1,10)
+	
+	--title
+	xx=16
+	yy=8
+	local val=sin(omegat*6)
+	local cols={0,1,2,8}
+	cursor(xx+22,yy+1)
+	print("monster cycle",cols[flr(val*2.4+2.5)])
+	cursor(xx+24,yy+1)
+	print("monster cycle",cols[flr(val*1.4+1.5)])
+	cursor(xx+23,yy+2)
+	print("monster cycle",cols[flr(val*2.4+2.5)])
+	cursor(xx+23,yy)
+	print("monster cycle",cols[flr(val*1.4+1.5)])
+	cursor(xx+23,yy+1)
+	print("monster cycle",7)
+	
+	--game mode prompts
+	yy=hss
+	cursor(xx+26,yy-1+val*4)
+	print("press 🅾️/x",1)
+	cursor(xx+28,yy-1+val*4)
+	print("press 🅾️/x",1)
+	cursor(xx+27,yy+val*4)
+	print("press 🅾️/x",1)
+	cursor(xx+27,yy-2+val*4)
+	print("press 🅾️/x",1)
+	cursor(xx+27,yy-1+val*4)
+	print("press 🅾️/x",10)
+	
+	--credits
+	yy=112
+	cursor(xx+2,yy+1)
+	print("created by nandbolt(v"..vnum..")",1)
+	cursor(xx,yy+1)
+	print("created by nandbolt(v"..vnum..")",1)
+	cursor(xx+1,yy+2)
+	print("created by nandbolt(v"..vnum..")",1)
+	cursor(xx+1,yy)
+	print("created by nandbolt(v"..vnum..")",1)
+	cursor(xx+1,yy+1)
+	print("created by nandbolt(v"..vnum..")",6)
+	
+	--fade
+	if mmstart then
+		circfill(hss,hss,(hss+28)*(1-(fade/30)),1)
+	end
+end
+-->8
+--save/load
+
+--save highscore
+function save_highscore(score)
+	dset(0,score)
+	ghigh=score
+end
+
+--load highscore
+function load_highscore()
+	cartdata(0)
+	ghigh=dget(0)
 end
 __gfx__
 00000000000111000001100000110000001111000010010000151000111fff5100111151015f11111dddddd11dd11dd11d1111d1001000000001510015151000
@@ -2272,8 +2727,16 @@ __map__
 41414141414141414141414141414140515142414141414141414051536c5d5d5d5d5e5e4d4f575e5e5d5d5d5d54555a524949494a7a696969695f6979697969796979695e5e7a69696969697a7249495053564e585552505152494a49494a49497b0b410a410a40514241405142414141414141405a4241414141417e59597e
 5b5a515c515a51515b515a5b515b5c5a515c5b5a515a515b5c5a515b536a5d5d5d5d5e4e570b4d4e5e5d5d5d5d6b555152494c494a7a696969695f5f5f5f5f5f5f5f5f5f5e5e7a69696969697a4949495053564d5855525051524a4949494b49497b51515151515151515151515151515151515151515151515151513b59597e
 __sfx__
-000100000000014550145501455015550155501655016550155500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000061000600036000260002600116000060002600026000160009600016000160000600006000060000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000061000510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00100000190501f050260502705000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00100000191500c150091500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0002000003030060500b04004130091300d1200811004110001000f70002700077000270006700037000670009700077000f7000b7000f7001b700147001b7001c7001c7001b7001670000000000000000000000
+000400000415009150101500313009130101300311009110101100c1001210010100131001510017100051000710007100091000b1000d1000e1000f10004100041000510006100061000710007100091000a100
+001000200375006710005500261004750057100375000710035500671007750027100475006310005500671000750036100575007410005500471007750017100575001610037500571000550037100575002710
+00100000198501f850268502693026810268302681000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000002c9500c940099300992009810099000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000200075000710007500071000750007100015000110000500001000750007100015000110007500071000050000100075000710001500011000050000100075000710001500011000750007100055000510
+001000000405004030040500403004050040300005000030000500003000050000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0008000015b501cb500fb5012b501cb5017b500e0000900006000040000080026a0026a0026a0026a0026a0029a002da0031a0033a0030a0022a0011a000ca0034a0034a0034a0034a0035a0035a0035a0035a00
+0008000023a5023a202dd502dd2023d5023d2030e5030e2023e5023e202d9502d9402d9502d9302d9502d92029a0029a0029a0029a0029a0029a0029a0029a0029a002aa002aa002aa002aa002ba002ba002ba00
+__music__
+03 02424344
+03 05064744
+
