@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
---monster cycle
+--monster cycle(v0.9)
 --by nandbolt
 
 --game state
@@ -722,9 +722,6 @@ function make_zombie(x,y,is_player)
 	--blaster
 	init_zombie_blaster(zombie)
 	
-	--xp
-	zombie.maxxp=6
-	
 	--player or npc
 	if is_player then
 		zombie.update_input=update_player_input
@@ -845,7 +842,7 @@ function init_actor(a,x,y,is_player)
 	a.invulnerable=false
 	
 	--xp
-	a.maxxp=4
+	a.maxxp=3
 	a.xp=0
 	
 	--meter
@@ -1853,8 +1850,8 @@ spnr.cnt=0 --spawn counter
 spnr.freq=30 --spawn frequency
 spnr.maxghosts=6 --max ghost spawns
 spnr.maxwraiths=4 --max wraith spawns
-spnr.maxzombies=12 --max zombie spawns
-spnr.maxskeletons=8 --max skeleton spawns
+spnr.maxzombies=8 --max zombie spawns
+spnr.maxskeletons=6 --max skeleton spawns
 spnr.maxhumans=8 --max human spawns
 
 --update spawn point
@@ -1944,9 +1941,6 @@ function make_skeleton(x,y,is_player)
 	
 	--blaster
 	init_skeleton_blaster(skeleton)
-	
-	--xp
-	skeleton.maxxp=6
 	
 	--player or npc
 	if is_player then
