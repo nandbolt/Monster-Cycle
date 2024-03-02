@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
---monster cycle(v0.9.1)
+--monster cycle(v0.9.2)
 --by nandbolt
 
 --music--
