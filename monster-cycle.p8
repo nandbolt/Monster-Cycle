@@ -5,6 +5,8 @@ __lua__
 --by nandbolt
 
 --music--
+audio_artist=""
+audio_credits_color=6
 music_mainmenu=0
 music_ghost=1
 music_undead=2
@@ -31,7 +33,7 @@ sfx_highscore=8
 gstate=0
 gtime=0 --game time (steps)
 ghigh=0 --high score (steps)
-vnum="0.9.1"
+vnum="0.9.2"
 debug_mode=false
 
 --actor pools
@@ -95,6 +97,9 @@ actors_inview=0
 
 --init
 function _init()
+	--generate tip
+	tip=tips[irnd(1,#tips)]
+	
 	--not menu state
 	if gstate==gst_menu then
 		mmx=irnd(0,(mw-ss)/ts)
@@ -210,10 +215,10 @@ function _update()
 	
 	--menu game state
 	if gstate==gst_menu then
+		--main menu
 		if mmstart then
 			if fade<=0 then
-				gstate=gst_active
-				_init()
+				gstate=gst_help
 			elseif (delay<=0) then
 				fade-=1
 			else
@@ -226,6 +231,13 @@ function _update()
 			delay=mmdelay
 			sfx(sfx_gamestart)
 			music(-1) --stop music
+		end
+	elseif gstate==gst_help then
+		--help menu
+		if btnp(5) then
+			gstate=gst_active
+			_init()
+			sfx(sfx_gamestart)
 		end
 	else
 		--update spawner
@@ -281,6 +293,8 @@ function _draw()
 	--menu state
 	if gstate==gst_menu then
 		draw_mainmenu()
+	elseif gstate==gst_help then
+		draw_helpmenu()
 	else
 		--draw tiles
 		map(0,0,0,0,mw,mh)
@@ -407,17 +421,21 @@ function _draw()
 			end
 		--death menu
 		elseif gstate==gst_dead then
-			local xx,yy=cam.x+33,cam.y+33
+			local xx,yy=cam.x+16,cam.y+33
 			local str=""
 			
 			--death prompt
 			str="more than death."
-			oprint(str,xx,yy,7,1)
+			oprint(str,xx,yy,8,1)
+			
+			--tip
+			yy+=24
+			oprint("tip:\n"..tip,xx,yy,7,1)
 			
 			--restart prompt
-			yy+=32
-			str="❎ to retry"
-			oprint(str,xx,yy,7,1)
+			yy+=40
+			str="❎/x to retry"
+			oprint(str,xx,yy,10,1)
 		--victory menu
 		elseif gstate==gst_complete then
 			local xx,yy=cam.x+32,cam.y+16
@@ -487,9 +505,10 @@ st_wander=0 --wander state
 st_fight=1 --fight state
 st_flee=2 --flee state
 gst_menu=0 --menu game state
-gst_active=1 --active game state
-gst_dead=2 --dead game state
-gst_complete=3 --complete game state
+gst_help=1 --help menu state
+gst_active=2 --active game state
+gst_dead=3 --dead game state
+gst_complete=4 --complete game state
 
 --returns vector2 length
 function get_vec_len(x,y)
@@ -1783,43 +1802,17 @@ function draw_debug(a)
 		draw_hitbox(a)
 		
 		--facing direction
-		line(a.x,a.y,a.x+a.xfacing*8,a.y+a.yfacing*8,7)
+		--line(a.x,a.y,a.x+a.xfacing*8,a.y+a.yfacing*8,7)
 		if a!=player then
 			local c=7
 			if a.mstate==st_fight then 
 				c=10
 			elseif a.mstate==st_flee then
 				c=14
-			else
-				c=7
 			end
-			
-			--target square
-			rect(a.x-a.tradius,a.y-a.tradius,
-				a.x+a.tradius,a.y+a.tradius,7)
 			
 			--target vector
 			line(a.x,a.y,a.tx,a.ty,c)
-			
-			--state circle
-			circfill(a.x,a.y,1,c)
-		else
-			a.tradius=48
-			local targ=get_near_targ(a)
-			cursor(a.x-22,a.y-12)
-			
-			--target square
-			--rect(a.x-a.tradius,a.y-a.tradius,
-			--	a.x+a.tradius,a.y+a.tradius,7)
-			
-			--target message
-			if targ==nil then
-				print("nobody near")
-			else
-				print("target near")
-				--target vector
-				line(a.x,a.y,targ.x,targ.y,9)
-			end
 		end
 	end
 end
@@ -2492,7 +2485,7 @@ function draw_mainmenu()
 	phase=0.22
 	amp=32
 	circ(hss,hss,amp+1,1)
-	circ(hss,hss,amp-1,1)
+	circ(hss,hss,amp-1)
 	circ(hss,hss,amp,7)
 	xx=hss-amp*cos(omegat+phase)
 	yy=hss+amp*sin(omegat+phase)
@@ -2539,28 +2532,35 @@ function draw_mainmenu()
 	yy=8
 	local val=sin(omegat*6)
 	local cols={0,1,2,8}
+	local cidx1,cidx2=flr(
+		val*2.4+2.5),flr(val*1.4+1.5)
 	cursor(xx+22,yy+1)
-	print("monster cycle",cols[flr(val*2.4+2.5)])
+	print("monster cycle",cols[cidx1])
 	cursor(xx+24,yy+1)
-	print("monster cycle",cols[flr(val*1.4+1.5)])
+	print("monster cycle",cols[cidx2])
 	cursor(xx+23,yy+2)
-	print("monster cycle",cols[flr(val*2.4+2.5)])
+	print("monster cycle",cols[cidx1])
 	cursor(xx+23,yy)
-	print("monster cycle",cols[flr(val*1.4+1.5)])
+	print("monster cycle",cols[cidx2])
 	cursor(xx+23,yy+1)
 	print("monster cycle",7)
 	
 	--game mode prompts
 	xx=43
 	yy=hss-1+val*4
-	str="press 🅾️/x"
+	str="press ❎/x"
 	oprint(str,xx,yy,10,1)
 	
 	--credits
-	xx=17
-	yy=113
-	str="created by nandbolt(v"..vnum..")"
+	xx=15
+	yy=114
+	str="game by nandbolt(v"..vnum..")"
 	oprint(str,xx,yy,6,1)
+	yy=105
+	str="music/sfx by "..audio_artist
+	xx=hss-#str*1.5-12
+	oprint(str,xx,yy,
+		audio_credits_color,1)
 	
 	--fade
 	if mmstart then
@@ -2602,6 +2602,38 @@ end
 function load_highscore()
 	cartdata(0)
 	ghigh=dget(0)
+end
+-->8
+--help menu
+
+tips={
+	"spirits are invincible\nwhen dashing.",
+	"zombie breath goes\nthrough walls.",
+	"monsters flee when their\nabilities are on cooldown.",
+	"any ability can be used\nso long as there is meter.",
+	"slow and steady wins\nthe race!",
+	"zombies and skeletons\ncan't hurt each other.",
+	"humans can't hurt\nother humans.",
+	"humans can either have\na pistol or a knife.",
+	"spirits can't see\nhumans or the undead.",
+	"humans or the undead\ncan't see spirits.",
+	"wraiths have a faster\ndash than ghosts.",
+	"wraiths can only shoot\ntwice before recharging.",
+	"skeletons can only\nthrow bones.",
+	"zombies have a hard\ntime turning.",
+	"keep an eye on your\nability and cooldown meters.",
+	"water slows down\nhumans and the undead.",
+	"choose spawn points\nthat are safe!",
+	"every monster is equal.",
+	"kiting spirits in a\ncircle is effective.",
+	"ghosts have a larger\nability meter than wraiths.",
+}
+
+--draw help menu
+function draw_helpmenu()
+	cls(1)
+	cursor(16,16)
+	print("there is no end in death.\nas a lowly ghost, fight\nother ghosts, gain xp, \nascend to the next monster\ntier and escape the\nmonster cycle!\n\ncontrols\n⬆️⬇️⬅️➡️:move\n🅾️/z:ability 1\n❎/x:ability 2\np/enter:pause\n\n*tip*\n"..tip.."\n\n❎/x to start",7)
 end
 __gfx__
 00000000000111000001100000110000001111000010010000151000111fff5100111151015f11111dddddd11dd11dd11d1111d1001000000001510015151000
