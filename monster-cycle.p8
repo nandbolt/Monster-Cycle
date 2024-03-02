@@ -4,6 +4,29 @@ __lua__
 --monster cycle(v0.9.1)
 --by nandbolt
 
+--music--
+music_mainmenu=0
+music_ghost=1
+music_undead=2
+music_human=3
+---------
+
+--sfxs--
+sfx_kill=3
+sfx_ascend=7
+sfx_ghostdash=9
+sfx_ghostblast=11
+sfx_wraithdash=0
+sfx_wraithblast=10
+sfx_zombiecharge=14
+sfx_zombiebreath=12
+sfx_skeletonthrow=13
+sfx_humandash=15
+sfx_pistolshot=16
+sfx_gamestart=1
+sfx_highscore=8
+---------
+
 --game state
 gstate=0
 gtime=0 --game time (steps)
@@ -76,11 +99,15 @@ function _init()
 	if gstate==gst_menu then
 		mmx=irnd(0,(mw-ss)/ts)
 		mmy=irnd(0,(mh-ss)/ts)
-		music(0)
+		music(music_mainmenu)
 		load_highscore()
 	else
 		--clear music
-		music(1)
+		if debug_mode then
+			music(music_human)
+		else
+			music(music_ghost)
+		end
 		
 		--clear run
 		gtime=0
@@ -171,6 +198,12 @@ function _update()
 	--fog
 	update_fog()
 	
+	--debug mode
+	if btn(0) and btn(1) and
+		btn(4) and btnp(5) then
+		debug_mode=not debug_mode
+	end
+	
 	--update particles
 	foreach(ps,update_p)
 	foreach(ps2,update_p)
@@ -191,8 +224,8 @@ function _update()
 			mmstart=true
 			fade=mmfade
 			delay=mmdelay
-			sfx(1)
-			music(-1)
+			sfx(sfx_gamestart)
+			music(-1) --stop music
 		end
 	else
 		--update spawner
@@ -230,7 +263,7 @@ function _update()
 			elseif btnp(5) then
 				mmstart=true
 				fade=mmfade
-				sfx(1)
+				sfx(sfx_gamestart)
 			end
 		--active state
 		else
@@ -308,7 +341,7 @@ function _draw()
 			shdwprint(str,xx,yy,13)
 			
 			--actors
-			yy+=8
+			yy+=16
 			val=#ghosts
 			str="🐱 "..val
 			shdwprint(str,xx,yy,12)
@@ -330,17 +363,17 @@ function _draw()
 			shdwprint(str,xx,yy,15)
 			
 			--controls
-			yy+=34
+			yy=cam.y+116
 			str=player.oprompt
 			shdwprint(str,xx,yy,12)
-			yy+=8
+			yy-=8
 			str=player.xprompt
 			shdwprint(str,xx,yy,14)
 			
 			--highscore
 			local hseconds=flr(ghigh/30)
 			if (ghigh==0) hseconds="none"
-			xx+=hss+22
+			xx+=86
 			yy=cam.y+2
 			str="high:"..hseconds
 			shdwprint(str,xx,yy,10)
@@ -570,8 +603,7 @@ function make_ghost(x,y,is_player)
 	init_trail(ghost,12)
 	
 	--dash
-	init_dash(ghost,3,1)
-	ghost.sfxoaction=9
+	init_dash(ghost,3,1,sfx_ghostdash)
 	
 	--blaster
 	init_ghost_blaster(ghost)
@@ -627,7 +659,7 @@ function init_ghost_blaster(ghost)
 	ghost.pburst=1
 	ghost.psize=1
 	ghost.pethereal=true
-	ghost.sfxxaction=11
+	ghost.sfxxaction=sfx_ghostblast
 end
 
 --enter ghost wander state
@@ -746,8 +778,7 @@ function make_zombie(x,y,is_player)
 	zombie.sprs=zombie.rsprs
 	
 	--dash
-	init_run(zombie,4)
-	zombie.sfxoaction=14
+	init_run(zombie,4,sfx_zombiecharge)
 	
 	--blaster
 	init_zombie_blaster(zombie)
@@ -807,7 +838,7 @@ function init_zombie_blaster(zombie)
 	zombie.pcost=30
 	zombie.pethereal=true
 	zombie.pdraw=draw_zombie_proj
-	zombie.sfxxaction=12
+	zombie.sfxxaction=sfx_z0mbiebreath
 end
 
 --enter zombie wander state
@@ -1155,13 +1186,14 @@ function update_trail(a)
 end
 
 --init dash
-function init_dash(a,dspd,dc)
+function init_dash(a,dspd,dc,dsfx)
 	--states
 	a.dashing=false
 	a.dashspd=dspd
 	a.dashctrail=dc --dash trail color
 	a.burststr=1.5 --burst strength
 	a.burstcost=10 --burst cost
+	a.sfxoaction=dsfx --dash sound
 end
 
 --init run
@@ -1257,8 +1289,8 @@ function actor_kill(a,oa)
 	--add xp
 	a.xp=clamp(a.xp+1,0,a.maxxp)
 	
-	--ascend sound
-	if (a.inview) sfx(3)
+	--kill sound
+	if (a.inview) sfx(sfx_kill)
 	
 	--if player and ready to ascend
 	if a==player then
@@ -1293,7 +1325,7 @@ end
 --ascend
 function ascend(a)
 	local is_player=a==player
-	if (a.inview) sfx(7)
+	if (a.inview) sfx(sfx_ascend)
 	
 	--to tier 2
 	if a.tier+1==2 then
@@ -1305,7 +1337,7 @@ function ascend(a)
 		
 		--undead music
 		if is_player then
-			music(2)
+			music(music_undead)
 		end
 	--to tier 3
 	elseif a.tier+1==3 then
@@ -1313,7 +1345,7 @@ function ascend(a)
 		
 		--human music
 		if is_player then
-			music(3)
+			music(music_human)
 		end
 	--to tier 4
 	elseif a.tier+1==4 then
@@ -1323,7 +1355,7 @@ function ascend(a)
 			mmstart=false
 			if gtime<ghigh or ghigh==0 then
 				save_highscore(gtime)
-				sfx(8)
+				sfx(sfx_highscore)
 			end
 		end
 	end
@@ -1460,7 +1492,6 @@ end
 --descend
 function descend(a)
 	local is_player=a==player
-	if (is_player) sfx(4)
 	local c=1
 	
 	--to tier 2
@@ -1474,7 +1505,7 @@ function descend(a)
 		
 		--undead music
 		if is_player then
-			music(2)
+			music(music_undead)
 		end
 	--to tier 1
 	elseif a.tier-1==1 then
@@ -1487,14 +1518,13 @@ function descend(a)
 		
 		--ghost music
 		if is_player then
-			music(1)
+			music(music_ghost)
 		end
 	--to tier 0
 	elseif a.tier-1==0 then
 		if is_player then
 			gstate=gst_dead
 			mmstart=false
-			--sfx(4)
 		end
 	end
 	
@@ -1866,7 +1896,7 @@ function make_wraith(x,y,is_player)
 	init_trail(wraith,5)
 	
 	--dash
-	init_dash(wraith,4,8)
+	init_dash(wraith,4,8,sfx_wraithdash)
 	
 	--blaster
 	init_wraith_blaster(wraith)
@@ -1935,7 +1965,7 @@ function init_wraith_blaster(wraith)
 	wraith.pfollow=true
 	wraith.pcost=30
 	wraith.pethereal=true
-	wraith.sfxxaction=10
+	wraith.sfxxaction=sfx_wraithblast
 end
 
 --enter wraith wander state
@@ -2005,7 +2035,8 @@ end
 --update spawner
 function update_spawner()
 	spnr.cnt+=1
-	if spnr.cnt%spnr.freq==0 then 
+	if gstate==gst_active and 
+		spnr.cnt%spnr.freq==0 then 
 		local n=irnd(0,4)
 		if n==0 and #ghosts<spnr.maxghosts then
 			update_spawnpoint(true)
@@ -2134,8 +2165,8 @@ function init_skeleton_blaster(skeleton)
 	skeleton.pbounce=true
 	skeleton.pdraw=draw_skeleton_proj
 	skeleton.psprs={30,46,31,46}
-	skeleton.sfxoaction=13
-	skeleton.sfxxaction=13
+	skeleton.sfxoaction=sfx_skeletonthrow
+	skeleton.sfxxaction=sfx_skeletonthrow
 end
 
 --enter skeleton wander state
@@ -2195,7 +2226,7 @@ function make_human(x,y,is_player)
 	init_run(human,3)
 	human.contactdmg=false
 	human.burststr=2
-	human.sfxoaction=15
+	human.sfxoaction=sfx_humandash
 	
 	--item
 	init_human_item(human)
@@ -2262,7 +2293,7 @@ function init_human_item(human)
 		human.plife=15
 		human.pcost=15
 		human.pfragile=true
-		human.sfxxaction=16
+		human.sfxxaction=sfx_pistolshot
 		
 		--sprites
 		human.itmsprs={16,32,48}
@@ -2449,16 +2480,6 @@ function draw_mainmenu()
 	
 	--tiles
 	map(mmx,mmy,0,0,mw,mh)
-	
-	--gridlines
-	if debug_mode then
-		line(hss,0,hss,ss)
-		line(hss/2,0,hss/2,ss)
-		line(hss*3/2,0,hss*3/2,ss)
-		line(0,hss,ss,hss)
-		line(0,hss/2,ss,hss/2)
-		line(0,hss*3/2,ss,hss*3/2)
-	end
 	
 	--timer
 	mmtimer+=1
