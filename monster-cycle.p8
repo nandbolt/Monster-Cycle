@@ -5,7 +5,7 @@ __lua__
 --by nandbolt
 
 --music--
-audio_artist=""
+audio_artist="jamail chachere"
 audio_credits_color=6
 music_mainmenu=40
 music_ghost=44
@@ -355,26 +355,28 @@ function _draw()
 			shdwprint(str,xx,yy,13)
 			
 			--actors
-			yy+=16
-			val=#ghosts
-			str="🐱 "..val
-			shdwprint(str,xx,yy,12)
-			yy+=8
-			val=#wraiths
-			str="🐱 "..val
-			shdwprint(str,xx,yy,5)
-			yy+=8
-			val=#zombies
-			str="😐 "..val
-			shdwprint(str,xx,yy,3)
-			yy+=8
-			val=#skeletons
-			str="😐 "..val
-			shdwprint(str,xx,yy,7)
-			yy+=8
-			val=#humans
-			str="웃 "..val
-			shdwprint(str,xx,yy,15)
+			if (debug_mode) then
+				yy+=16
+				val=#ghosts
+				str="🐱 "..val
+				shdwprint(str,xx,yy,12)
+				yy+=8
+				val=#wraiths
+				str="🐱 "..val
+				shdwprint(str,xx,yy,5)
+				yy+=8
+				val=#zombies
+				str="😐 "..val
+				shdwprint(str,xx,yy,3)
+				yy+=8
+				val=#skeletons
+				str="😐 "..val
+				shdwprint(str,xx,yy,7)
+				yy+=8
+				val=#humans
+				str="웃 "..val
+				shdwprint(str,xx,yy,15)
+			end
 			
 			--controls
 			yy=cam.y+116
@@ -2557,7 +2559,7 @@ function draw_mainmenu()
 	str="game by nandbolt(v"..vnum..")"
 	oprint(str,xx,yy,6,1)
 	yy=105
-	str="music/sfx by "..audio_artist
+	str="music by "..audio_artist
 	xx=hss-#str*1.5-12
 	oprint(str,xx,yy,
 		audio_credits_color,1)
@@ -2632,8 +2634,8 @@ tips={
 --draw help menu
 function draw_helpmenu()
 	cls(1)
-	cursor(16,16)
-	print("there is no end in death.\nas a lowly ghost, fight\nother ghosts, gain xp, \nascend to the next monster\ntier and escape the\nmonster cycle!\n\ncontrols\n⬆️⬇️⬅️➡️:move\n🅾️/z:ability 1\n❎/x:ability 2\np/enter:pause\n\n*tip*\n"..tip.."\n\n❎/x to start",7)
+	cursor(8,8)
+	print("there is no end in death.\nas a lowly spirit, fight\nfor survival and gain\nenough xp to ascend\nto the next monster tier.\nescape the monster cycle!\n\ncontrols\n⬆️⬇️⬅️➡️:move\n🅾️/z:ability 1\n❎/x:ability 2\np/enter:pause\n\n*tip*\n"..tip.."\n\n❎/x to start",7)
 end
 __gfx__
 00000000000111000001100000110000001111000010010000151000111fff5100111151015f11111dddddd11dd11dd11d1111d1001000000001510015151000
