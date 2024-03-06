@@ -5,8 +5,8 @@ __lua__
 --by nandbolt
 
 --music--
-audio_artist="jamail chachere"
-audio_credits_color=6
+audio_artist="@jamailmusic"
+audio_credits_color=12
 music_mainmenu=40
 music_ghost=44
 music_undead=48
@@ -92,9 +92,6 @@ cfog={1,5,13}
 --target indicator
 ctarg={7}
 
---debugging
-actors_inview=0
-
 --init
 function _init()
 	--generate tip
@@ -108,11 +105,7 @@ function _init()
 		load_highscore()
 	else
 		--clear music
-		if debug_mode then
-			music(music_human)
-		else
-			music(music_ghost)
-		end
+		music(music_ghost)
 		
 		--clear run
 		gtime=0
@@ -186,14 +179,10 @@ function _init()
 		
 		--add player
 		update_spawnpoint(false)
-		if debug_mode then
-			make_human(spnr.x,spnr.y,true)
+		if rnd(1)<0.5 then
+			make_ghost(spnr.x,spnr.y,true)
 		else
-			if rnd(1)<0.5 then
-				make_ghost(spnr.x,spnr.y,true)
-			else
-				make_wraith(spnr.x,spnr.y,true)
-			end
+			make_wraith(spnr.x,spnr.y,true)
 		end
 	end
 end
@@ -202,12 +191,6 @@ end
 function _update()
 	--fog
 	update_fog()
-	
-	--debug mode
-	if btn(0) and btn(1) and
-		btn(4) and btnp(5) then
-		debug_mode=not debug_mode
-	end
 	
 	--update particles
 	foreach(ps,update_p)
@@ -348,30 +331,6 @@ function _draw()
 			str=player.goal
 			shdwprint(str,xx,yy,7)
 			
-			--actors
-			if (debug_mode) then
-				yy+=16
-				val=#ghosts
-				str="🐱 "..val
-				shdwprint(str,xx,yy,12)
-				yy+=8
-				val=#wraiths
-				str="🐱 "..val
-				shdwprint(str,xx,yy,5)
-				yy+=8
-				val=#zombies
-				str="😐 "..val
-				shdwprint(str,xx,yy,3)
-				yy+=8
-				val=#skeletons
-				str="😐 "..val
-				shdwprint(str,xx,yy,7)
-				yy+=8
-				val=#humans
-				str="웃 "..val
-				shdwprint(str,xx,yy,15)
-			end
-			
 			--controls
 			yy=cam.y+116
 			str=player.oprompt
@@ -396,31 +355,6 @@ function _draw()
 			
 			--target line
 			draw_targ_line()
-			
-			--debug
-			if debug_mode then
-				yy+=8
-				local dval=0
-				cursor(xx,yy)
-				print("mem:"..stat(0),7)
-				yy+=6
-				cursor(xx,yy)
-				print("cpu:"..stat(1),7)
-				yy+=6
-				cursor(xx,yy)
-				print("fps:"..stat(7),7)
-				yy+=6
-				dval=#ps+#ps2+
-					#projs+#ghosts+
-					#wraiths+#zombies+
-					#skeletons+#humans
-				cursor(xx,yy)
-				print("objs:"..dval)
-				yy+=6
-				cursor(xx,yy)
-				print("vis:"..actors_inview)
-				actors_inview=0
-			end
 		--death menu
 		elseif gstate==gst_dead then
 			local xx,yy=cam.x+16,cam.y+33
@@ -1053,7 +987,6 @@ function move_and_collide(a)
 	
 	--update view
 	a.inview=point_in_view(a.x,a.y)
-	if (a.inview) actors_inview+=1
 	
 	return collision
 end
@@ -1167,9 +1100,6 @@ function draw_actor(a)
 	if (a.tier==1 and a.dashing) sprite+=16
 	spr(sprite,a.x-hts,a.y-hts,
 		1,1,a.flipx,a.flipy)
-	
-	--debug
-	draw_debug(a)
 end
 
 --update meter
@@ -1795,28 +1725,6 @@ end
 function time_to_think(a)
 	a.mcnt+=1
 	return (a.mcnt%a.mfreq)==0
-end
-
---draw debug
-function draw_debug(a)
-	if debug_mode then
-		--bounding box
-		draw_hitbox(a)
-		
-		--facing direction
-		--line(a.x,a.y,a.x+a.xfacing*8,a.y+a.yfacing*8,7)
-		if a!=player then
-			local c=7
-			if a.mstate==st_fight then 
-				c=10
-			elseif a.mstate==st_flee then
-				c=14
-			end
-			
-			--target vector
-			line(a.x,a.y,a.tx,a.ty,c)
-		end
-	end
 end
 
 --get nearest target
