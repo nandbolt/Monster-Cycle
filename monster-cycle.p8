@@ -320,18 +320,7 @@ function _draw()
 			local xx,yy=cam.x+2,cam.y+2
 			local val,str=0,""
 			
-			--goal
-			str=player.goal
-			shdwprint(str,xx,yy,7)
-			
-			--timer
-			yy+=8
-			local seconds=flr(gtime/30)
-			str="time:"..seconds
-			shdwprint(str,xx,yy,7)
-			
 			--xp
-			yy+=8
 			val=player.xp/player.maxxp
 			rectfill(xx+9,yy+1,xx+41,yy+3,1)
 			rectfill(xx+10,yy+2,xx+10+ceil(32*val),yy+4,10)
@@ -353,6 +342,11 @@ function _draw()
 			rectfill(xx+10,yy+2,xx+10+flr(32*val),yy+4,13)
 			str="⧗"
 			shdwprint(str,xx,yy,13)
+			
+			--goal
+			yy+=8
+			str=player.goal
+			shdwprint(str,xx,yy,7)
 			
 			--actors
 			if (debug_mode) then
@@ -393,6 +387,12 @@ function _draw()
 			yy=cam.y+2
 			str="high:"..hseconds
 			shdwprint(str,xx,yy,10)
+			
+			--timer
+			yy+=8
+			local seconds=flr(gtime/30)
+			str="time:"..seconds
+			shdwprint(str,xx,yy,7)
 			
 			--target line
 			draw_targ_line()
