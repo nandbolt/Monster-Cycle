@@ -101,11 +101,11 @@ function _init()
 	if gstate==gst_menu then
 		mmx=irnd(0,(mw-ss)/ts)
 		mmy=irnd(0,(mh-ss)/ts)
-		music(music_mainmenu)
+		music(music_mainmenu,0,5)
 		load_highscore()
 	else
 		--clear music
-		music(music_ghost)
+		music(music_ghost,0,5)
 		
 		--clear run
 		gtime=0
@@ -213,7 +213,7 @@ function _update()
 			fade=mmfade
 			delay=mmdelay
 			sfx(sfx_gamestart)
-			music(-1) --stop music
+			music(-1,0,5) --stop music
 		end
 	elseif gstate==gst_help then
 		--help menu
@@ -1288,7 +1288,7 @@ function ascend(a)
 		
 		--undead music
 		if is_player then
-			music(music_undead)
+			music(music_undead,0,5)
 		end
 	--to tier 3
 	elseif a.tier+1==3 then
@@ -1296,7 +1296,7 @@ function ascend(a)
 		
 		--human music
 		if is_player then
-			music(music_human)
+			music(music_human,0,5)
 		end
 	--to tier 4
 	elseif a.tier+1==4 then
@@ -1456,7 +1456,7 @@ function descend(a)
 		
 		--undead music
 		if is_player then
-			music(music_undead)
+			music(music_undead,0,5)
 		end
 	--to tier 1
 	elseif a.tier-1==1 then
@@ -1469,7 +1469,7 @@ function descend(a)
 		
 		--ghost music
 		if is_player then
-			music(music_ghost)
+			music(music_ghost,0,5)
 		end
 	--to tier 0
 	elseif a.tier-1==0 then
