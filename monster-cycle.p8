@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
---monster cycle(v0.9.2)
+--monster cycle(v0.9.3)
 --by nandbolt
 
 --music--
@@ -33,7 +33,7 @@ sfx_highscore=8
 gstate=0
 gtime=0 --game time (steps)
 ghigh=0 --high score (steps)
-vnum="0.9.2"
+vnum="0.9.3"
 debug_mode=false
 
 --actor pools
