@@ -72,17 +72,13 @@ mmy=0
 mmstart=false
 mmdelay=30
 mmfade=30
+mmomega=1/360
 
 --delay
 delay=0
 
 --fade
 fade=0
-
---waves
-omega=1/360
-phase=0
-amp=0
 
 --fog
 fogtimer=0
@@ -91,6 +87,9 @@ cfog={1,5,13}
 
 --target indicator
 ctarg={7}
+
+--title
+tcols={0,1,2,8}
 
 --init
 function _init()
@@ -101,11 +100,11 @@ function _init()
 	if gstate==gst_menu then
 		mmx=irnd(0,(mw-ss)/ts)
 		mmy=irnd(0,(mh-ss)/ts)
-		music(music_mainmenu,0,5)
+		pmusic(music_mainmenu)
 		load_highscore()
 	else
-		--clear music
-		music(music_ghost,0,5)
+		--reset music
+		pmusic(music_ghost,0,5)
 		
 		--clear run
 		gtime=0
@@ -136,50 +135,32 @@ function _init()
 		end
 		
 		--zombies
-		make_zombie(58*ts+hts, --small grave
-			50*ts+hts,false)
-		make_zombie(117*ts+hts, --large grave1
-			37*ts+hts,false)
-		make_zombie(117*ts+hts, --large grave2
-			25*ts+hts,false)
-		make_zombie(104*ts+hts, --large grave3
-			31*ts+hts,false)
-		make_zombie(33*ts+hts, --beach
-			54*ts+hts,false)
-		make_zombie(120*ts+hts, --forest
-			55*ts+hts,false)
-		make_zombie(37*ts+hts, --fountain
-			41*ts+hts,false)
-		make_zombie(92*ts+hts, --river
-			31*ts+hts,false)
+		make_zombie(468,404,false) --small grave
+		make_zombie(940,300,false) --large grave1
+		make_zombie(940,204,false) --large grave2
+		make_zombie(836,252,false) --large grave3
+		make_zombie(268,436,false) --beach
+		make_zombie(964,444,false) --forest
+		make_zombie(300,332,false) --fountain
+		make_zombie(740,252,false) --river
 		
 		--skeletons
-		make_skeleton(58*ts+hts, --small grave
-			46*ts+hts,false)
-		make_skeleton(108*ts+hts, --large grave
-			31*ts+hts,false)
-		make_skeleton(103*ts+hts, --rocks
-			5*ts+hts,false)
-		make_skeleton(52*ts+hts, --hedges
-			12*ts+hts,false)
+		make_skeleton(468,372,false) --small grave
+		make_skeleton(868,252,false) --large grave
+		make_skeleton(828,44,false) --rocks
+		make_skeleton(420,100,false) --hedges
 		
 		--humans
-		make_human(16*ts+hts, --hotel
-			10*ts+hts,false)
-		make_human(115*ts+hts, --digger
-			10*ts+hts,false)
-		make_human(63*ts+hts, --church1
-			31*ts+hts,false)
-		make_human(73*ts+hts, --church2
-			30*ts+hts,false)
-		make_human(10*ts+hts, --beach
-			54*ts+hts,false)
-		make_human(92*ts+hts, --forest
-			58*ts+hts,false)
+		make_human(132,84,false) --hotel
+		make_human(924,84,false) --digger
+		make_human(508,252,false) --church1
+		make_human(588,244,false) --church2
+		make_human(84,436,false) --beach
+		make_human(740,468,false) --forest
 		
 		--add player
 		update_spawnpoint(false)
-		if rnd(1)<0.5 then
+		if half_chance() then
 			make_ghost(spnr.x,spnr.y,true)
 		else
 			make_wraith(spnr.x,spnr.y,true)
@@ -202,18 +183,19 @@ function _update()
 		if mmstart then
 			if fade<=0 then
 				gstate=gst_help
-			elseif (delay<=0) then
+				mmomega=1/360
+			elseif delay<=0 then
 				fade-=1
 			else
 				delay-=1
 			end
-			omega=lerp(omega,0,0.1)
+			mmomega=lerp(mmomega,0,0.1)
 		elseif btnp(5) then
 			mmstart=true
 			fade=mmfade
 			delay=mmdelay
 			sfx(sfx_gamestart)
-			music(-1,0,5) --stop music
+			pmusic(-1) --stop music
 		end
 	elseif gstate==gst_help then
 		--help menu
@@ -300,127 +282,56 @@ function _draw()
 		
 		--active state
 		if gstate==gst_active then
-			local xx,yy=cam.x+2,cam.y+2
-			local val,str=0,""
-			
-			--xp
-			val=player.xp/player.maxxp
-			rectfill(xx+9,yy+1,xx+41,yy+3,1)
-			rectfill(xx+10,yy+2,xx+10+ceil(32*val),yy+4,10)
-			str="xp"
-			shdwprint(str,xx,yy,10)
-			
-			--meter
-			yy+=8
-			val=player.meter/player.maxmeter
-			rectfill(xx+9,yy+1,xx+41,yy+3,1)
-			rectfill(xx+10,yy+2,xx+10+clamp(flr(32*val),0,32),yy+4,7)
-			str="★"
-			shdwprint(str,xx,yy,7)
-			
-			--cooldown
-			yy+=8
-			val=player.cooldwn/player.maxcooldwn
-			rectfill(xx+9,yy+1,xx+41,yy+3,1)
-			rectfill(xx+10,yy+2,xx+10+flr(32*val),yy+4,13)
-			str="⧗"
-			shdwprint(str,xx,yy,13)
-			
-			--goal
-			yy+=8
-			str=player.goal
-			shdwprint(str,xx,yy,7)
-			
-			--controls
-			yy=cam.y+116
-			str=player.oprompt
-			shdwprint(str,xx,yy,12)
-			yy-=8
-			str=player.xprompt
-			shdwprint(str,xx,yy,14)
-			
-			--highscore
-			local hseconds=flr(ghigh/30)
-			if (ghigh==0) hseconds="none"
-			xx+=86
-			yy=cam.y+2
-			str="high:"..hseconds
-			shdwprint(str,xx,yy,10)
-			
-			--timer
-			yy+=8
-			local seconds=flr(gtime/30)
-			str="time:"..seconds
-			shdwprint(str,xx,yy,7)
-			
-			--target line
+			draw_hud()
 			draw_targ_line()
 		--death menu
 		elseif gstate==gst_dead then
 			local xx,yy=cam.x+16,cam.y+33
-			local str=""
 			
 			--death prompt
-			str="more than death."
-			oprint(str,xx,yy,8,1)
+			oprint("more than death.",
+				xx,yy,8,1)
 			
 			--tip
 			yy+=24
-			oprint("tip:\n"..tip,xx,yy,7,1)
+			oprint("tip:\n"..tip,
+				xx,yy,7,1)
 			
 			--restart prompt
 			yy+=40
-			str="❎/x to retry"
-			oprint(str,xx,yy,10,1)
+			oprint("❎/x to retry",
+				xx,yy,10,1)
 		--victory menu
 		elseif gstate==gst_complete then
-			local xx,yy=cam.x+32,cam.y+16
+			local xx,yy=cam.x+33,cam.y+17
 			mmtimer+=1
 			
 			--victory prompt
-			local omegat=omega*mmtimer
-			phase=0.22
-			amp=32
-			local val=sin(mmtimer/60)
-			local cols={0,1,2,8}
-			cursor(xx,yy+1)
-			print("monster ascended.",cols[flr(val*2.4+2.5)])
-			cursor(xx+2,yy+1)
-			print("monster ascended.",cols[flr(val*1.4+1.5)])
-			cursor(xx+1,yy+2)
-			print("monster ascended.",cols[flr(val*2.4+2.5)])
-			cursor(xx+1,yy)
-			print("monster ascended.",cols[flr(val*1.4+1.5)])
-			cursor(xx+1,yy+1)
-			print("monster ascended.",7)
+			tprint("monster ascended.",
+				xx,yy)
 			
 			--time
-			yy+=41
-			xx+=1
+			yy+=40
 			local seconds=flr(gtime/30)
 			local c,nh=7,""
-			if (gtime==ghigh) then
+			if gtime==ghigh then
 				c=10
 				nh="(new high!)"
 			end
-			str="time:"..seconds..nh
-			oprint(str,xx,yy,c,1)
+			oprint("time:"..seconds..nh,
+				xx,yy,c,1)
 			
 			--restart prompt
 			yy+=40
-			str="❎ to play again"
-			oprint(str,xx,yy,7,1)
+			oprint("❎/x to play again",
+				xx,yy,7,1)
 		end
 		
 		--fade
 		if gstate==gst_active then
-			if fade>0 then
-				circfill(cam.x+hss,cam.y+hss,(hss+28)*(fade/30),1)
-			end
+			if (fade>0) draw_fadein()
 		else
-			if mmstart then
-				circfill(cam.x+hss,cam.y+hss,(hss+28)*(1-(fade/30)),1)
-			end
+			if (mmstart) draw_fadeout()
 		end
 	end
 end
@@ -537,6 +448,29 @@ function normalize_dir(a)
 	a.dx=cos(ang)
 	a.dy=sin(ang)
 end
+
+--50/50 chance
+function half_chance()
+	return rnd(1)<0.5
+end
+
+--sine wave
+-- omega:frequency
+-- x:input
+-- phase:angle offset
+-- amp:amplitude
+function swave(omega,x,phase,amp)
+	return amp*sin(omega*x+phase)
+end
+
+--cosine wave
+-- omega:frequency
+-- x:input
+-- phase:angle offset
+-- amp:amplitude
+function cwave(omega,x,phase,amp)
+	return amp*cos(omega*x+phase)
+end
 -->8
 --ghost
 
@@ -627,7 +561,7 @@ function ghost_fight(ghost)
 	enter_fight_state(ghost)
 	
 	--choose action
-	if rnd(1)<0.5 then
+	if half_chance() then
 		ghost.oaction=true
 	else
 		ghost.xactionp=true
@@ -806,7 +740,7 @@ function zombie_fight(zombie)
 	enter_fight_state(zombie)
 	
 	--choose action
-	if rnd(1)<0.5 then
+	if half_chance() then
 		zombie.oaction=true
 	else
 		zombie.xactionp=true
@@ -861,7 +795,7 @@ function init_actor(a,x,y,is_player)
 	a.targs={}
 	
 	--health
-	a.invulnerable=false
+	a.iframes=0 --invincibility frames
 	
 	--xp
 	a.maxxp=3
@@ -1014,8 +948,8 @@ function touching(a,pools)
 			local colliding=rect_intersect(
 				bbx1,bby1,bbx2,bby2,
 				obbx1,obby1,obbx2,obby2)
-			if oa!=a and not
-			 oa.invulnerable and
+			if oa!=a and
+			 oa.iframes<=0 and
 			 colliding then
 				return oa
 			end
@@ -1172,12 +1106,12 @@ function update_dash(a)
 			end
 		end
 		a.dashing=true
-		a.invulnerable=true
+		a.iframes=1
 		a.cooldwn=a.maxcooldwn
 		a.meter-=1
 	else
 		a.dashing=false
-		a.invulnerable=false
+		a.iframes=0
 		update_meter(a)
 	end
 	
@@ -1280,7 +1214,7 @@ function ascend(a)
 	
 	--to tier 2
 	if a.tier+1==2 then
-		if rnd(1)>0.5 then
+		if half_chance() then
 			make_zombie(a.x,a.y,is_player)
 		else
 			make_skeleton(a.x,a.y,is_player)
@@ -1288,7 +1222,7 @@ function ascend(a)
 		
 		--undead music
 		if is_player then
-			music(music_undead,0,5)
+			pmusic(music_undead)
 		end
 	--to tier 3
 	elseif a.tier+1==3 then
@@ -1296,7 +1230,7 @@ function ascend(a)
 		
 		--human music
 		if is_player then
-			music(music_human,0,5)
+			pmusic(music_human)
 		end
 	--to tier 4
 	elseif a.tier+1==4 then
@@ -1447,7 +1381,7 @@ function descend(a)
 	
 	--to tier 2
 	if a.tier-1==2 then
-		if rnd(1)>0.5 then
+		if half_chance() then
 			make_zombie(a.x,a.y,is_player)
 		else
 			make_skeleton(a.x,a.y,is_player)
@@ -1456,11 +1390,11 @@ function descend(a)
 		
 		--undead music
 		if is_player then
-			music(music_undead,0,5)
+			pmusic(music_undead)
 		end
 	--to tier 1
 	elseif a.tier-1==1 then
-		if rnd(1)>0.5 then
+		if half_chance() then
 			make_ghost(a.x,a.y,is_player)
 		else
 			make_wraith(a.x,a.y,is_player)
@@ -1469,7 +1403,7 @@ function descend(a)
 		
 		--ghost music
 		if is_player then
-			music(music_ghost,0,5)
+			pmusic(music_ghost)
 		end
 	--to tier 0
 	elseif a.tier-1==0 then
@@ -1881,7 +1815,7 @@ function wraith_fight(wraith)
 	enter_fight_state(wraith)
 	
 	--choose action
-	if rnd(1)<0.5 then
+	if half_chance() then
 		wraith.oaction=true
 	else
 		wraith.xactionp=true
@@ -2082,7 +2016,7 @@ function skeleton_fight(skeleton)
 	enter_fight_state(skeleton)
 	
 	--choose action
-	if rnd(1)<0.5 then
+	if half_chance() then
 		skeleton.oaction=true
 	else
 		skeleton.xactionp=true
@@ -2114,7 +2048,7 @@ function make_human(x,y,is_player)
 	human.trailon=false
 	
 	--sprite
-	if rnd(1)<0.5 then
+	if half_chance() then
 		human.rsprs={7,23}
 		human.dsprs={8,24}
 		human.dgsprs={9,25}
@@ -2379,7 +2313,6 @@ end
 --draw main menu
 function draw_mainmenu()
 	local xx,yy=0,0
-	local str=""
 	
 	--tiles
 	map(mmx,mmy,0,0,mw,mh)
@@ -2391,91 +2324,33 @@ function draw_mainmenu()
 	foreach(ps2,draw_p2)
 	
 	--monster cycle
-	local omegat=omega*mmtimer
-	phase=0.22
-	amp=32
-	circ(hss,hss,amp+1,1)
-	circ(hss,hss,amp-1)
-	circ(hss,hss,amp,7)
-	xx=hss-amp*cos(omegat+phase)
-	yy=hss+amp*sin(omegat+phase)
-	spr(2,xx-hts,yy-hts) --ghost
-	phase+=0.06
-	xx=hss-amp*cos(omegat+phase)
-	yy=hss+amp*sin(omegat+phase)
-	spr(5,xx-hts,yy-hts) --wraith
-	phase=0.55
-	xx=hss-amp*cos(omegat+phase)
-	yy=hss+amp*sin(omegat+phase)
-	spr(34,xx-hts,yy-hts) --zombie
-	phase+=0.06
-	xx=hss-amp*cos(omegat+phase)
-	yy=hss+amp*sin(omegat+phase)
-	spr(37,xx-hts,yy-hts) --skelly
-	phase=0.88
-	xx=hss-amp*cos(omegat+phase)
-	yy=hss+amp*sin(omegat+phase)
-	spr(8,xx-hts,yy-hts) --human1
-	phase+=0.06
-	xx=hss-amp*cos(omegat+phase)
-	yy=hss+amp*sin(omegat+phase)
-	spr(40,xx-hts,yy-hts) --human2
+	circ(hss,hss,33,1)
+	circ(hss,hss,31)
+	circ(hss,hss,32,7)
+	draw_mmsprite(2,0.22)   --ghost
+	draw_mmsprite(5,0.28)   --wraith
+	draw_mmsprite(34,0.55)  --zombie
+	draw_mmsprite(37,0.61)  --skelly
+	draw_mmsprite(8,0.88)   --human1
+	draw_mmsprite(40,0.94)  --human2
+	draw_mmsprite(62,0.415) --heart1
+	draw_mmsprite(62,0.745) --heart2
+	draw_mmsprite(62,0.075) --heart3
+	tprint("monster cycle",39,9)
 	
-	phase=0.415
-	xx=hss-amp*cos(omegat+phase)
-	yy=hss+amp*sin(omegat+phase)
-	circfill(xx,yy,2,1)
-	circfill(xx,yy,1,10)
-	phase=0.745
-	xx=hss-amp*cos(omegat+phase)
-	yy=hss+amp*sin(omegat+phase)
-	circfill(xx,yy,2,1)
-	circfill(xx,yy,1,10)
-	phase=0.075
-	xx=hss-amp*cos(omegat+phase)
-	yy=hss+amp*sin(omegat+phase)
-	circfill(xx,yy,2,1)
-	circfill(xx,yy,1,10)
-	
-	--title
-	xx=16
-	yy=8
-	local val=sin(omegat*6)
-	local cols={0,1,2,8}
-	local cidx1,cidx2=flr(
-		val*2.4+2.5),flr(val*1.4+1.5)
-	cursor(xx+22,yy+1)
-	print("monster cycle",cols[cidx1])
-	cursor(xx+24,yy+1)
-	print("monster cycle",cols[cidx2])
-	cursor(xx+23,yy+2)
-	print("monster cycle",cols[cidx1])
-	cursor(xx+23,yy)
-	print("monster cycle",cols[cidx2])
-	cursor(xx+23,yy+1)
-	print("monster cycle",7)
-	
-	--game mode prompts
-	xx=43
-	yy=hss-1+val*4
-	str="press ❎/x"
-	oprint(str,xx,yy,10,1)
+	--play prompt
+	oprint("press ❎/x",43,
+		63+swave(mmomega*6,mmtimer,
+		0,4),10,1)
 	
 	--credits
-	xx=15
-	yy=114
-	str="game by nandbolt(v"..vnum..")"
-	oprint(str,xx,yy,6,1)
-	yy=105
-	str="music by "..audio_artist
-	xx=hss-#str*1.5-12
-	oprint(str,xx,yy,
-		audio_credits_color,1)
+	oprint("game by nandbolt(v"..vnum..")",
+		15,114,6,1)
+	oprint("music by "..audio_artist,
+		21,105,audio_credits_color,1)
 	
 	--fade
-	if mmstart then
-		circfill(hss,hss,(hss+28)*(1-(fade/30)),1)
-	end
+	if (mmstart) draw_fadeout()
 end
 
 --print outlined text
@@ -2498,6 +2373,57 @@ function shdwprint(str,x,y,c)
 	print(str,1)
 	cursor(x,y)
 	print(str,c)
+end
+
+--shadow bar
+-- x,y=corner
+-- w,h=width,height
+-- v=value of bar (0=empty,1=full)
+-- c=color
+function shdwbar(x,y,w,h,v,c)
+	rectfill(x-1,y-1,x+w-1,y+h-1,1)
+	rectfill(x,y,x+
+		flr(w*v*sgn(v)),
+		y+h,c)
+end
+
+--draw main menu sprite
+function draw_mmsprite(spridx,
+	phase)
+	spr(spridx,60-cwave(mmomega,
+		mmtimer,phase,32),60+
+		swave(mmomega,mmtimer,phase,32))
+end
+
+--title print
+function tprint(str,x,y)
+	local val=sin(mmomega*mmtimer*6)
+	local cidx1,cidx2=flr(
+		val*2.4+2.5),flr(val*1.4+1.5)
+	cursor(x-1,y)
+	print(str,tcols[cidx1])
+	cursor(x+1,y)
+	print(str,tcols[cidx2])
+	cursor(x,y+1)
+	print(str,tcols[cidx1])
+	cursor(x,y-1)
+	print(str,tcols[cidx2])
+	cursor(x,y)
+	print(str,7)
+end
+
+--draw fade out
+function draw_fadeout()
+	local r=(hss+28)*(1-(fade/30))
+	circfill(cam.x+hss,
+		cam.y+hss,r,2)
+end
+
+--draw fade in
+function draw_fadein()
+	local r=(hss+28)*(fade/30)
+	circfill(cam.x+hss,
+		cam.y+hss,r,2)
 end
 -->8
 --save/load
@@ -2541,9 +2467,69 @@ tips={
 
 --draw help menu
 function draw_helpmenu()
-	cls(1)
+	cls(2)
 	cursor(8,8)
 	print("there is no end in death.\nas a lowly spirit, fight\nfor survival and gain\nenough xp to ascend\nto the next monster tier.\nescape the monster cycle!\n\ncontrols\n⬆️⬇️⬅️➡️:move\n🅾️/z:ability 1\n❎/x:ability 2\np/enter:pause\n\n*tip*\n"..tip.."\n\n❎/x to start",7)
+end
+-->8
+--audio
+
+--play music
+function pmusic(idx)
+	music(idx,0,5)
+end
+-->8
+--hud
+
+--draw hud
+function draw_hud()
+	local xx,yy=cam.x+2,cam.y+2
+	
+	--xp
+	shdwbar(xx+10,yy+2,32,2,
+		player.xp/player.maxxp,10)
+	shdwprint("xp",xx,yy,10)
+	
+	--meter
+	yy+=8
+	shdwbar(xx+10,yy+2,32,2,
+		player.meter/player.maxmeter,
+		7)
+	shdwprint("★",xx,yy,7)
+	
+	--cooldown
+	yy+=8
+	shdwbar(xx+10,yy+2,32,2,
+		player.cooldwn/player.maxcooldwn,
+		13)
+	shdwprint("⧗",xx,yy,13)
+	
+	--goal
+	yy+=8
+	shdwprint(player.goal,
+		xx,yy,7)
+	
+	--controls
+	yy=cam.y+116
+	shdwprint(player.oprompt,
+		xx,yy,12)
+	yy-=8
+	shdwprint(player.xprompt,
+		xx,yy,14)
+	
+	--highscore
+	local hseconds=flr(ghigh/30)
+	if (ghigh==0) hseconds="none"
+	xx+=86
+	yy=cam.y+2
+	shdwprint("high:"..hseconds,
+		xx,yy,10)
+	
+	--timer
+	yy+=8
+	local seconds=flr(gtime/30)
+	shdwprint("time:"..seconds,
+		xx,yy,7)
 end
 __gfx__
 00000000000111000001100000110000001111000010010000151000111fff5100111151015f11111dddddd11dd11dd11d1111d1001000000001510015151000
@@ -2571,12 +2557,12 @@ __gfx__
 00151510015555b55b5555151b5555101d77dd7d17dddd1d1ddddd10015555451455551515555510f522225ff111111f75eeee577111111700017d10d516615d
 00015100001bbb51151111011bb5b51001ddd1111d1111010117d10000155111151111011551451045222254444444f4d5eeee5ddddddd7d000011001dd11dd1
 00100000000bbb50050000000000000001ddd11101dddd1001dddd100015511115111100001111114522255444466f44d5eee55dddd117dd000000001d1111d1
-01510000005555b50b555500005555bb1d77dd7d1d7777d11d717dd1015555451455551011555555f522225fff6446ff75eeee57771dd17700000000d161161d
-1545100005bbb85105bbbb5005bbbb5bd7117dd1d717717dd77717d1154441511544445155444455455222544fa48644d55eee5dd7ad81dd0000000016166161
-5454510005bbbb50b5bbbb5b55bbb855d77777d1d717717dd1777dd7154444514544445545444151f522225fff6486ff75eeee57771d81770000000015166151
-1d5d451005bbbb50b5bbbb5bb5bbbb5bd77777d17d7777ddd71777dd1544445145444455154444544522255444684644d5eee55ddd18d1dd0000000015166151
-0111585105bbb850b58bb85b15b8bb55d7117dd17dd77dd1dd7d7dd11544415145144151154144554522225444684a44d5eeee5ddd18dadd0000000016166161
-000015d15b555510515555b50b5555111d77dd10d1dddd711ddddd10545555105155554114555511f155551fff6446ff71555517771dd17700000000d161161d
+01510000005555b50b555500005555bb1d77dd7d1d7777d11d717dd1015555451455551011555555f522225fff6446ff75eeee57771dd17700100100d161161d
+1545100005bbb85105bbbb5005bbbb5bd7117dd1d717717dd77717d1154441511544445155444455455222544fa48644d55eee5dd7ad81dd01a11a1016166161
+5454510005bbbb50b5bbbb5b55bbb855d77777d1d717717dd1777dd7154444514544445545444151f522225fff6486ff75eeee57771d8177019aa91015166151
+1d5d451005bbbb50b5bbbb5bb5bbbb5bd77777d17d7777ddd71777dd1544445145444455154444544522255444684644d5eee55ddd18d1dd0199991015166151
+0111585105bbb850b58bb85b15b8bb55d7117dd17dd77dd1dd7d7dd11544415145144151154144554522225444684a44d5eeee5ddd18dadd0019910016166161
+000015d15b555510515555b50b5555111d77dd10d1dddd711ddddd10545555105155554114555511f155551fff6446ff71555517771dd17700011000d161161d
 00000110111bbb50101111510bb5110001dd77d1101111d1177d1100111444511011115114451100441111f4441661f4dd11117ddd11117d000000001d1111d1
 22222222222222222222222244444444444444444444444433333333333333333333333322222222222222222222222222222222cccccccccccccccccccccccc
 2202220222500222222020524494449444d99444444949d43343334333d443333334346322522222222222222222222222222222cccc1ccccccccccccccccccc
