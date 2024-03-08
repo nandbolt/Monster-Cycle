@@ -165,6 +165,7 @@ function _init()
 		else
 			make_wraith(spnr.x,spnr.y,true)
 		end
+--		make_human(spnr.x,spnr.y,true)
 	end
 end
 
@@ -795,6 +796,8 @@ function init_actor(a,x,y,is_player)
 	a.targs={}
 	
 	--health
+	a.maxhp=1
+	a.hp=1
 	a.iframes=0 --invincibility frames
 	
 	--xp
@@ -936,33 +939,18 @@ function touching(a,pools)
 	
 	--loop through target pool
 	for pool in all(pools) do
-		for i=#pool,1,-1 do
-			--get other bbox dimensions
-			local oa=pool[i]
-			local obbx1=oa.x-oa.bbhw
-			local obbx2=oa.x+oa.bbhw
-			local obby1=oa.y-oa.bbhh
-			local obby2=oa.y+oa.bbhh
-			
+		for oa in all(pool) do
 			--check rect intersection
-			local colliding=rect_intersect(
-				bbx1,bby1,bbx2,bby2,
-				obbx1,obby1,obbx2,obby2)
-			if oa!=a and
-			 oa.iframes<=0 and
-			 colliding then
+			if (oa!=a and 
+				rect_intersect(bbx1,bby1,
+				bbx2,bby2,oa.x-oa.bbhw,
+				oa.y-oa.bbhh,oa.x+oa.bbhw,
+				oa.y+oa.bbhh)) then
 				return oa
 			end
 		end
 	end
 	return nil
-end
-
---draw rectangular hitbox
-function draw_hitbox(a)
-	local bbx1,bbx2=a.x-a.bbhw,a.x+a.bbhw
-	local bby1,bby2=a.y-a.bbhh,a.y+a.bbhh
-	rect(bbx1,bby1,bbx2,bby2,7)
 end
 
 --renders the actor
@@ -1106,12 +1094,10 @@ function update_dash(a)
 			end
 		end
 		a.dashing=true
-		a.iframes=1
 		a.cooldwn=a.maxcooldwn
 		a.meter-=1
 	else
 		a.dashing=false
-		a.iframes=0
 		update_meter(a)
 	end
 	
@@ -1121,8 +1107,9 @@ function update_dash(a)
 		
 		--check dash collisions
 		local oa=touching(a,a.targs)
-		if oa!=nil then
-			actor_kill(a,oa)
+		if oa!=nil and
+			not oa.dashing then
+			dmg_actor(a,oa,1)
 		end
 	else
 		a.maxspd=a.normspd
@@ -1164,7 +1151,7 @@ function update_run(a)
 	if a.contactdmg then
 		local oa=touching(a,a.targs)
 		if oa!=nil then
-			actor_kill(a,oa)
+			dmg_actor(a,oa,1)
 		end
 	end
 end
@@ -1549,7 +1536,7 @@ function update_melee(a)
 	--check active hitbox
 	local oa=touching(a.melee,a.targs)
 	if oa!=nil then
-		actor_kill(a,oa)
+		dmg_actor(a,oa,1)
 	end
 end
 
@@ -1712,6 +1699,12 @@ function draw_targ_line()
 			end
 		end
 	end
+end
+
+--damage actor
+function dmg_actor(a,oa,dmg)
+	oa.hp-=dmg
+	if (oa.hp<=0) actor_kill(a,oa)
 end
 -->8
 --wraith
@@ -2156,11 +2149,6 @@ function draw_human_item(a)
 	spr(a.itmsprs[a.itmspridx],
 		a.x+a.itmxoff,a.y+a.itmyoff,
 		1,1,a.itmflipx,a.itmflipy)
-	
-	--melee hitbox
-	--if a.itmidx==2 then
-		--draw_hitbox(a.melee)
-	--end
 end
 
 --enter human wander state
@@ -2259,8 +2247,9 @@ function update_proj(p)
 	
 	--check collisions
 	local oa=touching(p,p.targs)
-	if oa!=nil and oa!=p.owner then
-		actor_kill(p.owner,oa)
+	if oa!=nil and oa!=p.owner and
+		not oa.dashing then
+		dmg_actor(p.owner,oa,1)
 		collision=true
 	end
 	
@@ -2280,8 +2269,6 @@ function draw_proj(p)
 		p.owner.tier==1)) then
 		p.draw(p)
 	end
-	--draw hitbox
-	--draw_hitbox(p)
 end
 
 --draw ghost projectile
@@ -2373,18 +2360,6 @@ function shdwprint(str,x,y,c)
 	print(str,1)
 	cursor(x,y)
 	print(str,c)
-end
-
---shadow bar
--- x,y=corner
--- w,h=width,height
--- v=value of bar (0=empty,1=full)
--- c=color
-function shdwbar(x,y,w,h,v,c)
-	rectfill(x-1,y-1,x+w-1,y+h-1,1)
-	rectfill(x,y,x+
-		flr(w*v*sgn(v)),
-		y+h,c)
 end
 
 --draw main menu sprite
@@ -2481,11 +2456,31 @@ end
 -->8
 --hud
 
+--shadow bar
+-- x,y=corner
+-- w,h=width,height
+-- v=value of bar (0=empty,1=full)
+-- c=color
+function shdwbar(x,y,w,h,v,c)
+	rectfill(x-1,y-1,x+w-1,y+h-1,1)
+	if v>0 then
+		rectfill(x,y,
+			x+flr(clamp(w*v,0,w)),
+			y+h,c)
+	end
+end
+
 --draw hud
 function draw_hud()
 	local xx,yy=cam.x+2,cam.y+2
 	
+	--hp
+	shdwbar(xx+10,yy+2,32,2,
+		player.hp/player.maxhp,8)
+	shdwprint("hp",xx,yy,8)
+	
 	--xp
+	yy+=8
 	shdwbar(xx+10,yy+2,32,2,
 		player.xp/player.maxxp,10)
 	shdwprint("xp",xx,yy,10)
@@ -2520,7 +2515,7 @@ function draw_hud()
 	--highscore
 	local hseconds=flr(ghigh/30)
 	if (ghigh==0) hseconds="none"
-	xx+=86
+	xx+=90
 	yy=cam.y+2
 	shdwprint("high:"..hseconds,
 		xx,yy,10)
