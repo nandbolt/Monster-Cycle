@@ -16,6 +16,7 @@ music_human=52
 --sfxs--
 sfx_kill=3
 sfx_hurt=3
+sfx_collect=1
 sfx_ascend=7
 sfx_ghostdash=9
 sfx_ghostblast=11
@@ -37,19 +38,16 @@ ghigh=0 --high score (steps)
 vnum="0.9.3"
 debug_mode=false
 
---actor pools
+--pools
 ghosts={}
 wraiths={}
 zombies={}
 skeletons={}
 humans={}
-
---projectiles
-projs={}
-
---particle system
-ps={}
-ps2={}
+projs={} --projectiles
+ps={} --low particle system
+ps2={} --high particle system
+collectables={}
 
 --camera
 cam={}
@@ -92,6 +90,30 @@ ctarg={7}
 --title
 tcols={0,1,2,8}
 
+--help
+tips={
+	"spirits are invincible\nwhen dashing.",
+	"zombie breath goes\nthrough walls.",
+	"monsters flee when their\nabilities are on cooldown.",
+	"any ability can be used\nso long as there is meter.",
+	"slow and steady wins\nthe race!",
+	"zombies and skeletons\ncan't hurt each other.",
+	"humans can't hurt\nother humans.",
+	"humans can either have\na pistol or a knife.",
+	"spirits can't see\nhumans or the undead.",
+	"humans or the undead\ncan't see spirits.",
+	"wraiths have a faster\ndash than ghosts.",
+	"wraiths can only shoot\ntwice before recharging.",
+	"skeletons can only\nthrow bones.",
+	"zombies have a hard\ntime turning.",
+	"keep an eye on your\nability and cooldown meters.",
+	"water slows down\nhumans and the undead.",
+	"choose spawn points\nthat are safe!",
+	"every monster is equal.",
+	"kiting spirits in a\ncircle is effective.",
+	"ghosts have a larger\nability meter than wraiths.",
+}
+
 --init
 function _init()
 	--generate tip
@@ -111,8 +133,7 @@ function _init()
 		gtime=0
 		
 		--clear particles
-		ps={}
-		ps2={}
+		
 		
 		--clear pools
 		ghosts={}
@@ -120,9 +141,10 @@ function _init()
 		zombies={}
 		skeletons={}
 		humans={}
-		
-		--clear projectiles
 		projs={}
+		ps={}
+		ps2={}
+		collectables={}
 		
 		--reset fade
 		fade=30
@@ -167,7 +189,7 @@ function _init()
 			make_wraith(spnr.x,spnr.y,true)
 		end
 --		make_human(spnr.x,spnr.y,true)
-		player.iframes=90
+		player.iframes=900
 	end
 end
 
@@ -211,15 +233,14 @@ function _update()
 		--update spawner
 		update_spawner()
 		
-		--update actors
+		--update pools
 		foreach(ghosts,update_ghost)
 		foreach(wraiths,update_wraith)
 		foreach(zombies,update_zombie)
 		foreach(skeletons,update_skeleton)
 		foreach(humans,update_human)
-		
-		--update projectiles
 		foreach(projs,update_proj)
+		foreach(collectables,update_collectable)
 		
 		--update camera
 		cam.x=lerp(cam.x,player.x-hss,
@@ -267,18 +288,15 @@ function _draw()
 		--draw tiles
 		map(0,0,0,0,mw,mh)
 		
-		--draw low particles
-		foreach(ps,draw_p)
-		
-		--draw actors
+		--draw pools
+		foreach(ps,draw_p) --low particles
+		foreach(collectables,draw_collectable)
 		foreach(ghosts,draw_ghost)
 		foreach(wraiths,draw_wraith)
 		foreach(zombies,draw_zombie)
 		foreach(skeletons,draw_skeleton)
 		foreach(humans,draw_human)
-		
-		--draw projectiles
-		foreach(projs,draw_proj)
+		foreach(projs,draw_proj) --high particles
 		
 		--draw high particles
 		foreach(ps2,draw_p2)
@@ -441,15 +459,17 @@ end
 
 --normalize direction vector
 function normalize_dir(a)
-	--zero vector
-	if (a.dx==0 and a.dy==0) return
-	
-	--get angle
-	local ang=atan2(a.dx,a.dy)
-	
-	--normalize
-	a.dx=cos(ang)
-	a.dy=sin(ang)
+	local dx,dy=normalize(a.dx,
+		a.dy)
+	a.dx=dx
+	a.dy=dy
+end
+
+--normalize vector
+function normalize(x,y)
+	if (x==0 and y==0) return 0,0
+	local ang=atan2(x,y)
+	return cos(ang),sin(ang)
 end
 
 --50/50 chance
@@ -517,6 +537,7 @@ function make_ghost(x,y,is_player)
 	--add to list
 	ghost.pool=ghosts
 	add(ghost.pool,ghost)
+	return ghost
 end
 
 --updates ghost logic
@@ -692,6 +713,7 @@ function make_zombie(x,y,is_player)
 	--add to list
 	zombie.pool=zombies
 	add(zombie.pool,zombie)
+	return zombie
 end
 
 --updates zombie logic
@@ -929,7 +951,7 @@ function move_and_collide(a)
 	
 	--iframes
 	if a.iframes!=nil and
-		a.iframes>0 then
+		not dmgable(a) then
 		a.iframes-=1
 	end
 	
@@ -964,7 +986,7 @@ end
 --renders the actor
 function draw_actor(a)
 	--iframes
-	if a.iframes>0 and
+	if not dmgable(a) and
 		a.iframes%2==0 then
 		return
 	end
@@ -1058,8 +1080,8 @@ end
 --update trail
 function update_trail(a)
 	if a.inview then
-		if a.trailon or a.xp==a.maxxp then
-			if a.xp==a.maxxp then
+		if a.trailon or a.xp>=a.maxxp then
+			if a.xp>=a.maxxp then
 				a.ctrail=10
 			elseif a.dashing then
 				a.ctrail=a.dashctrail
@@ -1122,8 +1144,11 @@ function update_dash(a)
 		--check dash collisions
 		local oa=touching(a,a.targs)
 		if oa!=nil and
+			dmgable(oa) and
 			not oa.dashing then
-			dmg_actor(a,oa,1)
+			knockback(oa,oa.x-a.x,
+				oa.y-a.y,4)
+			dmg_actor(oa,1)
 		end
 	else
 		a.maxspd=a.normspd
@@ -1164,41 +1189,41 @@ function update_run(a)
 	--contact damage
 	if a.contactdmg then
 		local oa=touching(a,a.targs)
-		if oa!=nil then
-			dmg_actor(a,oa,1)
+		if oa!=nil and dmgable(oa) then
+			knockback(oa,oa.x-a.x,
+				oa.y-a.y,4)
+			dmg_actor(oa,1)
 		end
 	end
 end
 
 --actor kill
-function actor_kill(a,oa)
-	--add xp
-	a.xp=clamp(a.xp+1,0,a.maxxp)
-	
+function actor_kill(a)
 	--kill sound
 	if (a.inview) sfx(sfx_kill)
 	
-	--if player and ready to ascend
-	if a==player then
-		if a.xp==a.maxxp then
-			if a.tier==1 then
-				player.goal="◆find tombtone!"
-			elseif a.tier==2 then
-				player.goal="⌂find bed!"
-			elseif a.tier==3 then
-				player.goal="∧find water!"
-			end
-		end
+	--descend
+	local x,y=a.x,a.y
+	local nxp=1+a.xp
+	local na=descend(a)
+	
+	--drop xp
+	for i=1,nxp do
+		spawn_xp(x+rnd(1)*ts-hts,
+			y+rnd(1)*ts-hts,na)
 	end
 	
-	--descend other actor
-	descend(oa)
+	--drop hp
+	if 0.1<0.2 then
+		spawn_hp(x+rnd(1)*ts-hts,
+			y+rnd(1)*ts-hts,na)
+	end
 end
 
 --check ascension
 function check_ascend(a)
 	--if enough xp
-	if a.xp==a.maxxp then
+	if a.xp>=a.maxxp then
 		--if on ascend tile
 		local tile=mget(a.x/ts,a.y/ts)
 		if in_table(a.ascenders,tile) then
@@ -1378,14 +1403,14 @@ end
 --descend
 function descend(a)
 	local is_player=a==player
-	local c=1
+	local c,na=1,nil
 	
 	--to tier 2
 	if a.tier-1==2 then
 		if half_chance() then
-			make_zombie(a.x,a.y,is_player)
+			na=make_zombie(a.x,a.y,is_player)
 		else
-			make_skeleton(a.x,a.y,is_player)
+			na=make_skeleton(a.x,a.y,is_player)
 		end
 		c=8
 		
@@ -1396,9 +1421,9 @@ function descend(a)
 	--to tier 1
 	elseif a.tier-1==1 then
 		if half_chance() then
-			make_ghost(a.x,a.y,is_player)
+			na=make_ghost(a.x,a.y,is_player)
 		else
-			make_wraith(a.x,a.y,is_player)
+			na=make_wraith(a.x,a.y,is_player)
 		end
 		c=5
 		
@@ -1422,6 +1447,9 @@ function descend(a)
 	
 	--destroy actor
 	del(a.pool,a)
+	
+	--return new actor
+	return na
 end
 
 --init blaster
@@ -1549,8 +1577,10 @@ function update_melee(a)
 	
 	--check active hitbox
 	local oa=touching(a.melee,a.targs)
-	if oa!=nil then
-		dmg_actor(a,oa,1)
+	if oa!=nil and dmgable(oa) then
+		knockback(oa,oa.x-a.x,
+			oa.y-a.y,4)
+		dmg_actor(oa,1)
 	end
 end
 
@@ -1716,18 +1746,28 @@ function draw_targ_line()
 end
 
 --damage actor
-function dmg_actor(a,oa,dmg)
-	if oa.iframes<=0 then
-		oa.hp-=dmg
-		if oa.hp<=0 then
-			actor_kill(a,oa)
-		else
-			oa.iframes=30
-			if oa.inview then
-				sfx(sfx_hurt)
-			end
+function dmg_actor(a,dmg)
+	a.hp-=dmg
+	if a.hp<=0 then
+		actor_kill(a)
+	else
+		a.iframes=30
+		if a.inview then
+			sfx(sfx_hurt)
 		end
 	end
+end
+
+--knockback
+function knockback(a,dx,dy,stren)
+	local kdx,kdy=normalize(dx,dy)
+	a.vx+=kdx*stren
+	a.vy+=kdy*stren
+end
+
+--damageable
+function dmgable(a)
+	return a.iframes<=0
 end
 -->8
 --wraith
@@ -1781,6 +1821,7 @@ function make_wraith(x,y,is_player)
 	--add to list
 	wraith.pool=wraiths
 	add(wraith.pool,wraith)
+	return wraith
 end
 
 --updates wraith logic
@@ -1978,6 +2019,7 @@ function make_skeleton(x,y,is_player)
 	--add to list
 	skeleton.pool=skeletons
 	add(skeleton.pool,skeleton)
+	return skeleton
 end
 
 --updates zombie logic
@@ -2104,6 +2146,7 @@ function make_human(x,y,is_player)
 	--add to list
 	human.pool=humans
 	add(human.pool,human)
+	return human
 end
 
 --updates human logic
@@ -2271,8 +2314,11 @@ function update_proj(p)
 	--check collisions
 	local oa=touching(p,p.targs)
 	if oa!=nil and oa!=p.owner and
+		dmgable(oa) and
 		not oa.dashing then
-		dmg_actor(p.owner,oa,1)
+		knockback(oa,oa.x-p.x,
+			oa.y-p.y,4)
+		dmg_actor(oa,1)
 		collision=true
 	end
 	
@@ -2318,7 +2364,7 @@ function draw_skeleton_proj(p)
 	spr(p.sprs[spridx],p.x-hts,p.y-hts)
 end
 -->8
---main menu
+--gui
 
 --draw main menu
 function draw_mainmenu()
@@ -2423,61 +2469,6 @@ function draw_fadein()
 	circfill(cam.x+hss,
 		cam.y+hss,r,2)
 end
--->8
---save/load
-
---save highscore
-function save_highscore(score)
-	dset(0,score)
-	ghigh=score
-end
-
---load highscore
-function load_highscore()
-	cartdata(0)
-	ghigh=dget(0)
-end
--->8
---help menu
-
-tips={
-	"spirits are invincible\nwhen dashing.",
-	"zombie breath goes\nthrough walls.",
-	"monsters flee when their\nabilities are on cooldown.",
-	"any ability can be used\nso long as there is meter.",
-	"slow and steady wins\nthe race!",
-	"zombies and skeletons\ncan't hurt each other.",
-	"humans can't hurt\nother humans.",
-	"humans can either have\na pistol or a knife.",
-	"spirits can't see\nhumans or the undead.",
-	"humans or the undead\ncan't see spirits.",
-	"wraiths have a faster\ndash than ghosts.",
-	"wraiths can only shoot\ntwice before recharging.",
-	"skeletons can only\nthrow bones.",
-	"zombies have a hard\ntime turning.",
-	"keep an eye on your\nability and cooldown meters.",
-	"water slows down\nhumans and the undead.",
-	"choose spawn points\nthat are safe!",
-	"every monster is equal.",
-	"kiting spirits in a\ncircle is effective.",
-	"ghosts have a larger\nability meter than wraiths.",
-}
-
---draw help menu
-function draw_helpmenu()
-	cls(2)
-	cursor(8,8)
-	print("there is no end in death.\nas a lowly spirit, fight\nfor survival and gain\nenough xp to ascend\nto the next monster tier.\nescape the monster cycle!\n\ncontrols\n⬆️⬇️⬅️➡️:move\n🅾️/z:ability 1\n❎/x:ability 2\np/enter:pause\n\n*tip*\n"..tip.."\n\n❎/x to start",7)
-end
--->8
---audio
-
---play music
-function pmusic(idx)
-	music(idx,0,5)
-end
--->8
---hud
 
 --shadow bar
 -- x,y=corner
@@ -2496,6 +2487,10 @@ end
 --draw hud
 function draw_hud()
 	local xx,yy=cam.x+2,cam.y+2
+	
+	--debug
+	--cursor(cam.x+2,cam.y+hss)
+	--print("collectables:"..#collectables)
 	
 	--hp
 	shdwbar(xx+10,yy+2,32,2,
@@ -2549,6 +2544,158 @@ function draw_hud()
 	shdwprint("time:"..seconds,
 		xx,yy,7)
 end
+
+--draw help menu
+function draw_helpmenu()
+	cls(2)
+	cursor(8,8)
+	print("there is no end in death.\nas a lowly spirit, fight\nfor survival and gain\nenough xp to ascend\nto the next monster tier.\nescape the monster cycle!\n\ncontrols\n⬆️⬇️⬅️➡️:move\n🅾️/z:ability 1\n❎/x:ability 2\np/enter:pause\n\n*tip*\n"..tip.."\n\n❎/x to start",7)
+end
+-->8
+--misc
+
+--save highscore
+function save_highscore(score)
+	dset(0,score)
+	ghigh=score
+end
+
+--load highscore
+function load_highscore()
+	cartdata(0)
+	ghigh=dget(0)
+end
+
+--play music
+function pmusic(idx)
+	music(idx,0,5)
+end
+-->8
+--collectable
+
+--init collectable
+function init_collectable(c,x,y)
+	c.owner=nil
+	c.targs={ghosts,wraiths,
+		zombies,skeletons,humans}
+	
+	--dimensions
+	c.bbhw=1 --bounding box half width
+	c.bbhh=1 --bounding box half height
+	c.inview=false --in camera view
+	
+	--movement
+	c.x=x --x position
+	c.y=y --y position
+	c.vx=(rnd(1)-0.5)*4 --x velocity
+	c.vy=(rnd(1)-0.5)*4 --y velocity
+	c.spd=0 --speed (for queries)
+	c.maxspd=0 --current max move speed
+	c.accel=0.05 --move acceleration
+	c.ethereal=false --ethereal=no wall collisions
+	c.bounce=false --bounce on walls
+	
+	--draw
+	c.spr=62
+	c.col=9
+	
+	--input
+	c.dx=0 --x direction
+	c.dy=0 --y direction
+	c.collect=collect
+	
+	--lifetime
+	c.life=150
+	
+	--trail
+	init_trail(c,10)
+end
+
+--update collectable
+function update_collectable(c)
+	--trail
+	update_proj_trail(c)
+	
+	--move and collide
+	local collision=move_and_collide(c)
+	
+	--check collect
+	local oa=touching(c,c.targs)
+	if oa!=nil and oa!=c.owner then
+		c.collect(oa,c)
+	else
+		--life timer
+		c.life-=1
+		if c.life<=0 then
+			del(collectables,c)
+		end
+	end
+end
+
+--draw collectable
+function draw_collectable(c)
+	--spr(c.spr,c.x,c.y)
+	local col=c.col
+	if (c.owner==player) col=5
+	circfill(c.x,c.y,1,col)
+end
+
+--collect
+function collect(a,c)
+	--kill sound
+	if (c.inview) sfx(sfx_collect)
+	del(collectables,c)
+end
+
+--spawn xp
+function spawn_xp(x,y,owner)
+	local xp={}
+	init_collectable(xp,x,y)
+	xp.collect=collect_xp
+	xp.owner=owner
+	
+	--add to pool
+	add(collectables,xp)
+end
+
+--collect xp
+function collect_xp(a,xp)
+	a.xp+=1
+	
+	--if player and ready to ascend
+	if a==player then
+		if a.xp>=a.maxxp then
+			if a.tier==1 then
+				player.goal="◆find tombtone!"
+			elseif a.tier==2 then
+				player.goal="⌂find bed!"
+			elseif a.tier==3 then
+				player.goal="∧find water!"
+			end
+		end
+	end
+	
+	collect(a,xp)
+end
+
+--spawn hp
+function spawn_hp(x,y,owner)
+	local hp={}
+	init_collectable(hp,x,y)
+	hp.collect=collect_hp
+	hp.col=8
+	hp.ctrail=14
+	hp.owner=owner
+	
+	--add to pool
+	add(collectables,hp)
+end
+
+--collect hp
+function collect_hp(a,hp)
+	a.hp=clamp(a.hp+1,0,a.maxhp)
+	collect(a,hp)
+end
 __gfx__
 00000000000111000001100000110000001111000010010000151000111fff5100111151015f11111dddddd11dd11dd11d1111d1001000000001510015151000
 00000000001ccc10001cc10001cc11000155771001511510015551005f555510015555f1015555ffd555555dd556655dd165561d015111100015451054545100
@@ -2576,10 +2723,10 @@ __gfx__
 00015100001bbb51151111011bb5b51001ddd1111d1111010117d10000155111151111011551451045222254444444f4d5eeee5ddddddd7d000011001dd11dd1
 00100000000bbb50050000000000000001ddd11101dddd1001dddd100015511115111100001111114522255444466f44d5eee55dddd117dd000000001d1111d1
 01510000005555b50b555500005555bb1d77dd7d1d7777d11d717dd1015555451455551011555555f522225fff6446ff75eeee57771dd17700100100d161161d
-1545100005bbb85105bbbb5005bbbb5bd7117dd1d717717dd77717d1154441511544445155444455455222544fa48644d55eee5dd7ad81dd01a11a1016166161
-5454510005bbbb50b5bbbb5b55bbb855d77777d1d717717dd1777dd7154444514544445545444151f522225fff6486ff75eeee57771d8177019aa91015166151
-1d5d451005bbbb50b5bbbb5bb5bbbb5bd77777d17d7777ddd71777dd1544445145444455154444544522255444684644d5eee55ddd18d1dd0199991015166151
-0111585105bbb850b58bb85b15b8bb55d7117dd17dd77dd1dd7d7dd11544415145144151154144554522225444684a44d5eeee5ddd18dadd0019910016166161
+1545100005bbb85105bbbb5005bbbb5bd7117dd1d717717dd77717d1154441511544445155444455455222544fa48644d55eee5dd7ad81dd01e11e1016166161
+5454510005bbbb50b5bbbb5b55bbb855d77777d1d717717dd1777dd7154444514544445545444151f522225fff6486ff75eeee57771d8177018ee81015166151
+1d5d451005bbbb50b5bbbb5bb5bbbb5bd77777d17d7777ddd71777dd1544445145444455154444544522255444684644d5eee55ddd18d1dd0188881015166151
+0111585105bbb850b58bb85b15b8bb55d7117dd17dd77dd1dd7d7dd11544415145144151154144554522225444684a44d5eeee5ddd18dadd0018810016166161
 000015d15b555510515555b50b5555111d77dd10d1dddd711ddddd10545555105155554114555511f155551fff6446ff71555517771dd17700011000d161161d
 00000110111bbb50101111510bb5110001dd77d1101111d1177d1100111444511011115114451100441111f4441661f4dd11117ddd11117d000000001d1111d1
 22222222222222222222222244444444444444444444444433333333333333333333333322222222222222222222222222222222cccccccccccccccccccccccc
