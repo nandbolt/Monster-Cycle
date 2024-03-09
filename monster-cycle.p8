@@ -15,6 +15,7 @@ music_human=52
 
 --sfxs--
 sfx_kill=3
+sfx_hurt=3
 sfx_ascend=7
 sfx_ghostdash=9
 sfx_ghostblast=11
@@ -166,6 +167,7 @@ function _init()
 			make_wraith(spnr.x,spnr.y,true)
 		end
 --		make_human(spnr.x,spnr.y,true)
+		player.iframes=90
 	end
 end
 
@@ -796,9 +798,9 @@ function init_actor(a,x,y,is_player)
 	a.targs={}
 	
 	--health
-	a.maxhp=1
-	a.hp=1
-	a.iframes=0 --invincibility frames
+	a.maxhp=3
+	a.hp=3
+	a.iframes=30 --invincibility frames
 	
 	--xp
 	a.maxxp=3
@@ -925,6 +927,12 @@ function move_and_collide(a)
 	--update view
 	a.inview=point_in_view(a.x,a.y)
 	
+	--iframes
+	if a.iframes!=nil and
+		a.iframes>0 then
+		a.iframes-=1
+	end
+	
 	return collision
 end
 
@@ -955,6 +963,12 @@ end
 
 --renders the actor
 function draw_actor(a)
+	--iframes
+	if a.iframes>0 and
+		a.iframes%2==0 then
+		return
+	end
+	
 	--update sprites
 	a.animcnt+=a.spd*3
 	if a.animcnt>=30 then
@@ -1703,8 +1717,17 @@ end
 
 --damage actor
 function dmg_actor(a,oa,dmg)
-	oa.hp-=dmg
-	if (oa.hp<=0) actor_kill(a,oa)
+	if oa.iframes<=0 then
+		oa.hp-=dmg
+		if oa.hp<=0 then
+			actor_kill(a,oa)
+		else
+			oa.iframes=30
+			if oa.inview then
+				sfx(sfx_hurt)
+			end
+		end
+	end
 end
 -->8
 --wraith
