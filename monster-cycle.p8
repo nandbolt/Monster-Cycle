@@ -5,7 +5,7 @@ __lua__
 --by nandbolt
 
 --music--
-audio_artist="@jamailmusic"
+audio_artist="@jAMAILmUSIC"
 audio_credits_color=12
 music_mainmenu=40
 music_ghost=44
@@ -126,14 +126,8 @@ function _init()
 		pmusic(music_mainmenu)
 		load_highscore()
 	else
-		--reset music
-		pmusic(music_ghost,0,5)
-		
 		--clear run
 		gtime=0
-		
-		--clear particles
-		
 		
 		--clear pools
 		ghosts={}
@@ -189,7 +183,10 @@ function _init()
 			make_wraith(spnr.x,spnr.y,true)
 		end
 --		make_human(spnr.x,spnr.y,true)
-		player.iframes=900
+--		player.iframes=900
+--		player.xp=3
+--		player.maxhp=16
+--		player.hp=player.maxhp
 	end
 end
 
@@ -226,6 +223,7 @@ function _update()
 		--help menu
 		if btnp(5) then
 			gstate=gst_active
+			pmusic(music_ghost)
 			_init()
 			sfx(sfx_gamestart)
 		end
@@ -523,9 +521,9 @@ function make_ghost(x,y,is_player)
 	--player or npc
 	if is_player then
 		ghost.update_input=update_player_input
-		ghost.goal="✽fight ghosts."
-		ghost.oprompt="🅾️/z dash"
-		ghost.xprompt="❎/x shoot"
+		ghost.goal="              gHOST\n    FIGHT SPIRITS✽\n ASCEND TO UNDEAD웃"
+		ghost.oprompt="🅾️/z dASH"
+		ghost.xprompt="❎/x sHOOT"
 		player=ghost
 	else
 		init_actor_npc(ghost)
@@ -699,9 +697,9 @@ function make_zombie(x,y,is_player)
 	--player or npc
 	if is_player then
 		zombie.update_input=update_player_input
-		zombie.goal="웃eat humans."
-		zombie.oprompt="🅾️/z charge"
-		zombie.xprompt="❎/x breath"
+		zombie.goal="             zOMBIE\n       EAT HUMANS웃\n  ASCEND TO HUMAN♥"
+		zombie.oprompt="🅾️/z cHARGE"
+		zombie.xprompt="❎/x bREATHE"
 		player=zombie
 	else
 		init_actor_npc(zombie)
@@ -751,6 +749,7 @@ function init_zombie_blaster(zombie)
 	zombie.plife=30
 	zombie.pcost=30
 	zombie.pethereal=true
+	zombie.pkstr=0
 	zombie.pdraw=draw_zombie_proj
 	zombie.sfxxaction=sfx_z0mbiebreath
 end
@@ -825,7 +824,7 @@ function init_actor(a,x,y,is_player)
 	a.iframes=30 --invincibility frames
 	
 	--xp
-	a.maxxp=3
+	a.maxxp=4
 	a.xp=0
 	
 	--meter
@@ -843,6 +842,9 @@ function init_actor(a,x,y,is_player)
 	a.xaction=false --❎ action
 	a.oactionp=false --🅾️ action pressed
 	a.xactionp=false --❎ action pressed
+	
+	--drops
+	a.hpchance=0.2
 end
 
 --inits vars for npc actor
@@ -1147,7 +1149,7 @@ function update_dash(a)
 			dmgable(oa) and
 			not oa.dashing then
 			knockback(oa,oa.x-a.x,
-				oa.y-a.y,4)
+				oa.y-a.y,a.spd)
 			dmg_actor(oa,1)
 		end
 	else
@@ -1191,7 +1193,7 @@ function update_run(a)
 		local oa=touching(a,a.targs)
 		if oa!=nil and dmgable(oa) then
 			knockback(oa,oa.x-a.x,
-				oa.y-a.y,4)
+				oa.y-a.y,a.spd*1.5)
 			dmg_actor(oa,1)
 		end
 	end
@@ -1214,9 +1216,13 @@ function actor_kill(a)
 	end
 	
 	--drop hp
-	if 0.1<0.2 then
-		spawn_hp(x+rnd(1)*ts-hts,
-			y+rnd(1)*ts-hts,na)
+	if rnd(1)<a.hpchance then
+		local xx,yy=x+rnd(1)*ts-hts,y+rnd(1)*ts-hts
+		if rnd(1)<0.2 then
+			spawn_maxhp(xx,yy,na)
+		else
+			spawn_hp(xx,yy,na)
+		end
 	end
 end
 
@@ -1476,6 +1482,10 @@ function init_blaster(a)
 	
 	--lifetime
 	a.plife=30
+	
+	--damage
+	a.pdmg=1
+	a.pkstr=2
 end
 
 --update blaster
@@ -1567,6 +1577,7 @@ function init_melee(a)
 	a.melee.bboff=8 --hitbox offset
 	a.melee.bbhw=3 --hitbox half width
 	a.melee.bbhh=3 --hitbox half height
+	a.melee.dmg=2
 end
 
 --update melee
@@ -1579,8 +1590,8 @@ function update_melee(a)
 	local oa=touching(a.melee,a.targs)
 	if oa!=nil and dmgable(oa) then
 		knockback(oa,oa.x-a.x,
-			oa.y-a.y,4)
-		dmg_actor(oa,1)
+			oa.y-a.y,4+a.spd)
+		dmg_actor(oa,a.melee.dmg)
 	end
 end
 
@@ -1807,9 +1818,9 @@ function make_wraith(x,y,is_player)
 	--player or npc
 	if is_player then
 		wraith.update_input=update_player_input
-		wraith.goal="✽fight ghosts."
-		wraith.oprompt="🅾️/z dash"
-		wraith.xprompt="❎/x shoot"
+		wraith.goal="             wRAITH\n    FIGHT SPIRITS✽\n ASCEND TO UNDEAD웃"
+		wraith.oprompt="🅾️/z dASH"
+		wraith.xprompt="❎/x sHOOT"
 		player=wraith
 	else
 		init_actor_npc(wraith)
@@ -1859,6 +1870,8 @@ function init_wraith_blaster(wraith)
 	wraith.pfollow=true
 	wraith.pcost=30
 	wraith.pethereal=true
+	wraith.pdmg=2
+	wraith.pkstr=4
 	wraith.sfxxaction=sfx_wraithblast
 end
 
@@ -2005,9 +2018,9 @@ function make_skeleton(x,y,is_player)
 	--player or npc
 	if is_player then
 		skeleton.update_input=update_player_input
-		skeleton.goal="웃fight humans."
-		skeleton.oprompt="🅾️/z throw x3"
-		skeleton.xprompt="❎/x throw"
+		skeleton.goal="           sKELETON\n     FIGHT HUMANS✽\n  ASCEND TO HUMAN♥"
+		skeleton.oprompt="🅾️/z tHROW X3"
+		skeleton.xprompt="❎/x tHROW"
 		player=skeleton
 	else
 		init_actor_npc(skeleton)
@@ -2127,14 +2140,14 @@ function make_human(x,y,is_player)
 	init_human_item(human)
 	
 	--xp
-	human.maxxp=10
+	human.maxxp=16
 	
 	--player or npc
 	if is_player then
 		human.update_input=update_player_input
-		human.goal="✽kill monsters"
-		human.oprompt="🅾️/z run"
-		human.xprompt="❎/x item"
+		human.goal="              hUMAN\n     FIGHT UNDEAD✽\n ESCAPE THE CYCLE⧗"
+		human.oprompt="🅾️/z rUN"
+		human.xprompt="❎/x iTEM"
 		player=human
 	else
 		init_actor_npc(human)
@@ -2189,6 +2202,7 @@ function init_human_item(human)
 		human.plife=15
 		human.pcost=15
 		human.pfragile=true
+		human.pkstr=1
 		human.sfxxaction=sfx_pistolshot
 		
 		--sprites
@@ -2283,6 +2297,10 @@ function spawn_proj(a,x,y,dx,dy,burst)
 	--trail
 	init_trail(proj,a.pc2)
 	
+	--damage
+	proj.dmg=a.pdmg
+	proj.kstr=a.pkstr
+	
 	--add to projectile pool
 	add(projs,proj)
 end
@@ -2317,8 +2335,8 @@ function update_proj(p)
 		dmgable(oa) and
 		not oa.dashing then
 		knockback(oa,oa.x-p.x,
-			oa.y-p.y,4)
-		dmg_actor(oa,1)
+			oa.y-p.y,p.kstr)
+		dmg_actor(oa,p.dmg)
 		collision=true
 	end
 	
@@ -2395,14 +2413,14 @@ function draw_mainmenu()
 	tprint("monster cycle",39,9)
 	
 	--play prompt
-	oprint("press ❎/x",43,
+	oprint("pRESS ❎/x",43,
 		63+swave(mmomega*6,mmtimer,
 		0,4),10,1)
 	
 	--credits
-	oprint("game by nandbolt(v"..vnum..")",
-		15,114,6,1)
-	oprint("music by "..audio_artist,
+	oprint("gAME BY nandbolt (V"..vnum..")",
+		13,114,6,1)
+	oprint("mUSIC BY "..audio_artist,
 		21,105,audio_credits_color,1)
 	
 	--fade
@@ -2495,13 +2513,17 @@ function draw_hud()
 	--hp
 	shdwbar(xx+10,yy+2,32,2,
 		player.hp/player.maxhp,8)
-	shdwprint("hp",xx,yy,8)
+	shdwprint("♥",xx,yy,8)
+	draw_bardivs(xx+10,yy+2,
+		player.maxhp)
 	
 	--xp
 	yy+=8
 	shdwbar(xx+10,yy+2,32,2,
 		player.xp/player.maxxp,10)
 	shdwprint("xp",xx,yy,10)
+	draw_bardivs(xx+10,yy+2,
+		player.maxxp)
 	
 	--meter
 	yy+=8
@@ -2509,47 +2531,65 @@ function draw_hud()
 		player.meter/player.maxmeter,
 		7)
 	shdwprint("★",xx,yy,7)
-	
-	--cooldown
-	yy+=8
-	shdwbar(xx+10,yy+2,32,2,
-		player.cooldwn/player.maxcooldwn,
-		13)
-	shdwprint("⧗",xx,yy,13)
-	
-	--goal
-	yy+=8
-	shdwprint(player.goal,
-		xx,yy,7)
+	local v=1-player.cooldwn/
+		player.maxcooldwn
+	if v>0 then
+		rectfill(xx+10,yy+4,
+			xx+10+flr(clamp(32*v,0,32)),
+			yy+4,13)
+	end
 	
 	--controls
 	yy=cam.y+116
+	local c1,c2=13,13
+	if (player.oaction) c1=12
+	if (player.xaction) c2=14
 	shdwprint(player.oprompt,
-		xx,yy,12)
+		xx,yy,c1)
 	yy-=8
 	shdwprint(player.xprompt,
-		xx,yy,14)
+		xx,yy,c2)
+	
+	--goal
+	xx+=48
+	yy=cam.y+2
+	c1=7
+	if (player.xp>=player.maxxp) c1=10
+	shdwprint(player.goal,
+		xx,yy,c1)
 	
 	--highscore
-	local hseconds=flr(ghigh/30)
-	if (ghigh==0) hseconds="none"
-	xx+=90
-	yy=cam.y+2
-	shdwprint("high:"..hseconds,
-		xx,yy,10)
+--	local hseconds=flr(ghigh/30)
+--	if (ghigh==0) hseconds="none"
+--	xx+=90
+--	yy=cam.y+2
+--	shdwprint("high:"..hseconds,
+--		xx,yy,10)
 	
 	--timer
-	yy+=8
-	local seconds=flr(gtime/30)
-	shdwprint("time:"..seconds,
-		xx,yy,7)
+--	yy+=8
+--	local seconds=flr(gtime/30)
+--	shdwprint("time:"..seconds,
+--		xx,yy,7)
 end
 
 --draw help menu
 function draw_helpmenu()
 	cls(2)
 	cursor(8,8)
-	print("there is no end in death.\nas a lowly spirit, fight\nfor survival and gain\nenough xp to ascend\nto the next monster tier.\nescape the monster cycle!\n\ncontrols\n⬆️⬇️⬅️➡️:move\n🅾️/z:ability 1\n❎/x:ability 2\np/enter:pause\n\n*tip*\n"..tip.."\n\n❎/x to start",7)
+	print("tHERE IS NO END IN DEATH.\naS A LOWLY SPIRIT, FIGHT\nFOR SURVIVAL AND GAIN\nENOUGH xp TO ASCEND\nTO THE NEXT MONSTER TIER.\neSCAPE THE monster cycle!\n\ncONTROLS\n⬆️⬇️⬅️➡️:mOVE\n🅾️/z:aBILITY 1\n❎/x:aBILITY 2\np/enter:pAUSE\n\n*tIP*\n"..tip.."\n\n❎/x TO START",7)
+end
+
+--draw bar dividers
+-- x:rect x
+-- y:rect y
+-- v:value
+-- mv:max value
+function draw_bardivs(x,y,mv)
+	for i=0,mv do
+		local xx=x+flr(i*32/mv)
+		line(xx,y,xx,y+2,1)
+	end
 end
 -->8
 --misc
@@ -2666,11 +2706,11 @@ function collect_xp(a,xp)
 	if a==player then
 		if a.xp>=a.maxxp then
 			if a.tier==1 then
-				player.goal="◆find tombtone!"
+				player.goal="    rEADY TO ASCEND\n FIND A TOMBSTONE◆"
 			elseif a.tier==2 then
-				player.goal="⌂find bed!"
+				player.goal="    rEADY TO ASCEND\n       FIND A BED⌂"
 			elseif a.tier==3 then
-				player.goal="∧find water!"
+				player.goal="    rEADY TO ASCEND\n       FIND WATER∧"
 			end
 		end
 	end
@@ -2695,6 +2735,26 @@ end
 function collect_hp(a,hp)
 	a.hp=clamp(a.hp+1,0,a.maxhp)
 	collect(a,hp)
+end
+
+--spawn maxhp
+function spawn_maxhp(x,y,owner)
+	local maxhp={}
+	init_collectable(maxhp,x,y)
+	maxhp.collect=collect_maxhp
+	maxhp.col=14
+	maxhp.ctrail=8
+	maxhp.owner=owner
+	
+	--add to pool
+	add(collectables,maxhp)
+end
+
+--collect maxhp
+function collect_maxhp(a,maxhp)
+	a.maxhp+=1
+	a.hp+=1
+	collect(a,maxhp)
 end
 __gfx__
 00000000000111000001100000110000001111000010010000151000111fff5100111151015f11111dddddd11dd11dd11d1111d1001000000001510015151000
@@ -2721,14 +2781,14 @@ __gfx__
 0015851015bbb851b58bb85b15b8bb51d7117dd11dd77dd7dd7d7dd11544415115144154154144514522225416666a61d5eeee5d11111a110001d7d1d516615d
 00151510015555b55b5555151b5555101d77dd7d17dddd1d1ddddd10015555451455551515555510f522225ff111111f75eeee577111111700017d10d516615d
 00015100001bbb51151111011bb5b51001ddd1111d1111010117d10000155111151111011551451045222254444444f4d5eeee5ddddddd7d000011001dd11dd1
-00100000000bbb50050000000000000001ddd11101dddd1001dddd100015511115111100001111114522255444466f44d5eee55dddd117dd000000001d1111d1
-01510000005555b50b555500005555bb1d77dd7d1d7777d11d717dd1015555451455551011555555f522225fff6446ff75eeee57771dd17700100100d161161d
-1545100005bbb85105bbbb5005bbbb5bd7117dd1d717717dd77717d1154441511544445155444455455222544fa48644d55eee5dd7ad81dd01e11e1016166161
-5454510005bbbb50b5bbbb5b55bbb855d77777d1d717717dd1777dd7154444514544445545444151f522225fff6486ff75eeee57771d8177018ee81015166151
-1d5d451005bbbb50b5bbbb5bb5bbbb5bd77777d17d7777ddd71777dd1544445145444455154444544522255444684644d5eee55ddd18d1dd0188881015166151
-0111585105bbb850b58bb85b15b8bb55d7117dd17dd77dd1dd7d7dd11544415145144151154144554522225444684a44d5eeee5ddd18dadd0018810016166161
-000015d15b555510515555b50b5555111d77dd10d1dddd711ddddd10545555105155554114555511f155551fff6446ff71555517771dd17700011000d161161d
-00000110111bbb50101111510bb5110001dd77d1101111d1177d1100111444511011115114451100441111f4441661f4dd11117ddd11117d000000001d1111d1
+00100000000bbb50050000000000000001ddd11101dddd1001dddd100015511115111100001111114522255444466f44d5eee55dddd117dd000110001d1111d1
+01510000005555b50b555500005555bb1d77dd7d1d7777d11d717dd1015555451455551011555555f522225fff6446ff75eeee57771dd17700188100d161161d
+1545100005bbb85105bbbb5005bbbb5bd7117dd1d717717dd77717d1154441511544445155444455455222544fa48644d55eee5dd7ad81dd01977f1016166161
+5454510005bbbb50b5bbbb5b55bbb855d77777d1d717717dd1777dd7154444514544445545444151f522225fff6486ff75eeee57771d81771a7777e115166151
+1d5d451005bbbb50b5bbbb5bb5bbbb5bd77777d17d7777ddd71777dd1544445145444455154444544522255444684644d5eee55ddd18d1dd1a7777e115166151
+0111585105bbb850b58bb85b15b8bb55d7117dd17dd77dd1dd7d7dd11544415145144151154144554522225444684a44d5eeee5ddd18dadd01b77d1016166161
+000015d15b555510515555b50b5555111d77dd10d1dddd711ddddd10545555105155554114555511f155551fff6446ff71555517771dd177001cc100d161161d
+00000110111bbb50101111510bb5110001dd77d1101111d1177d1100111444511011115114451100441111f4441661f4dd11117ddd11117d000110001d1111d1
 22222222222222222222222244444444444444444444444433333333333333333333333322222222222222222222222222222222cccccccccccccccccccccccc
 2202220222500222222020524494449444d99444444949d43343334333d443333334346322522222222222222222222222222222cccc1ccccccccccccccccccc
 202500222222205225020222494d9944444449d44d949444343644333f3f34d33643433325222222220022222222022222222222ccc1c11cccccc11ccccccccc
