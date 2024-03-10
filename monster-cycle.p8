@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
---monster cycle(v0.9.3)
+--monster cycle(v1.0.0)
 --by nandbolt
 
 --game state
@@ -150,10 +150,8 @@ function _init()
 			make_wraith(spnrx,spnry,true)
 		end
 		player.iframes=90
---		make_human(spnrx,spnry,true)
---		player.xp=3
---		player.maxhp=16
---		player.hp=player.maxhp
+--		ascend(player)
+--		ascend(player)
 	end
 end
 
@@ -831,7 +829,6 @@ function init_actor_npc(a)
 	a.tx=a.x --target x position
 	a.ty=a.y --target y position
 	a.mstate=st_wander --mental state
-	a.mfreq=30 --think frequency
 	a.mcnt=irnd(0,29) --mental counter
 	a.tradius=48 --target detection radius
 	
@@ -1083,7 +1080,6 @@ function init_dash(a,dspd,dc,dsfx)
 	a.dashspd=dspd
 	a.dashctrail=dc --dash trail color
 	a.burststr=1.5 --burst strength
-	a.burstcost=10 --burst cost
 	a.sfxoaction=dsfx --dash sound
 end
 
@@ -1093,7 +1089,6 @@ function init_run(a,rspd)
 	a.running=false
 	a.runspd=rspd
 	a.burststr=0
-	a.burstcost=30
 	a.contactdmg=true
 end
 
@@ -1104,7 +1099,7 @@ function update_dash(a)
 			--burst
 			a.vx+=a.dx*a.burststr
 			a.vy+=a.dy*a.burststr
-			a.meter-=a.burstcost
+			use_meter(a,10)
 			
 			--if player
 			if a.inview then
@@ -1112,8 +1107,7 @@ function update_dash(a)
 			end
 		end
 		a.dashing=true
-		a.cooldwn=a.maxcooldwn
-		a.meter-=1
+		use_meter(a,1)
 	else
 		a.dashing=false
 		update_meter(a)
@@ -1147,7 +1141,7 @@ function update_run(a)
 			if a.burststr!=0 then
 				a.vx+=a.dx*a.burststr
 				a.vy+=a.dy*a.burststr
-				a.meter-=a.burstcost
+				use_meter(a,20)
 			end
 			
 			--if player
@@ -1156,8 +1150,7 @@ function update_run(a)
 			end
 		end
 		a.running=true
-		a.cooldwn=a.maxcooldwn
-		a.meter-=1
+		use_meter(a,1)
 	else
 		a.running=false
 		update_meter(a)
@@ -1243,10 +1236,8 @@ function ascend(a)
 		--undead music
 		if is_player then
 			pmusic(48)
+			gsoff=8.5 --update spirit plane
 		end
-		
-		--update spirit plane
-		gsoff=8.5
 	--to tier 3
 	elseif a.tier+1==3 then
 		make_human(a.x,a.y,is_player)
@@ -1427,10 +1418,8 @@ function descend(a)
 		--ghost music
 		if is_player then
 			pmusic(44)
+			gsoff=1 --update spirit plane
 		end
-		
-		--update spirit plane
-		gsoff=1
 	--to tier 0
 	elseif a.tier-1==0 then
 		if is_player then
@@ -1494,12 +1483,11 @@ function update_blaster(a)
 		
 		--blast
 		spawn_proj(a,a.x,a.y,a.dx,a.dy,a.pburst+a.spd)
-		a.meter-=a.pcost
+		use_meter(a,a.pcost)
 		a.vx+=-a.dx*a.precoil
 		a.vy+=-a.dy*a.precoil
 		
 		--cooldown
-		a.cooldwn=a.maxcooldwn
 		a.xactionp=false
 		
 		--if player
@@ -1547,12 +1535,11 @@ function update_blaster2(a)
 		end
 		spawn_proj(a,a.x,a.y,ds[1],ds[2],a.pburst+a.spd)
 		spawn_proj(a,a.x,a.y,ds[3],ds[4],a.pburst+a.spd)
-		a.meter-=a.pcost*3
+		use_meter(a,a.pcost*3)
 		a.vx+=-a.dx*a.precoil
 		a.vy+=-a.dy*a.precoil
 		
 		--cooldown
-		a.cooldwn=a.maxcooldwn
 		a.oactionp=false
 		
 		--if player
@@ -1568,13 +1555,24 @@ function init_melee(a)
 	a.melee.targs=a.targs
 	a.melee.x=0
 	a.melee.y=0
-	a.melee.bboff=8 --hitbox offset
 	a.melee.bbhw=4 --hitbox half width
 	a.melee.bbhh=4 --hitbox half height
 end
 
 --update melee
 function update_melee(a)
+	--check stab input + meter cost
+	if a.xaction and a.meter>0 then
+		a.gitmoff=12
+		if a.xactionp then
+			use_meter(a,10)
+		else
+			use_meter(a,1)
+		end
+	else
+		a.gitmoff=6
+	end
+	
 	--update melee position
 	a.melee.x=a.x+a.itmxoff+hts
 	a.melee.y=a.y+a.itmyoff+hts
@@ -1582,8 +1580,10 @@ function update_melee(a)
 	--check active hitbox
 	local oa=touching(a.melee,a.targs)
 	if oa!=nil and dmgable(oa) then
+		local kstr=4+a.spd
+		if (a.xaction) kstr+=2
 		knockback(oa,oa.x-a.x,
-			oa.y-a.y,4+a.spd)
+			oa.y-a.y,kstr)
 		local dmg=1
 		if (a.msty) dmg=999
 		dmg_actor(oa,dmg)
@@ -1610,12 +1610,11 @@ function update_item(a)
 			spawn_proj(a,a.x+xoff,
 				a.y+yoff,dx,dy,
 				a.pburst+a.spd)
-			a.meter-=a.pcost
+			use_meter(a,a.pcost)
 			a.vx+=-dx*a.precoil
 			a.vy+=-dy*a.precoil
 			
 			--cooldown
-			a.cooldwn=a.maxcooldwn
 			a.xactionp=false
 			
 			--if player
@@ -1663,39 +1662,35 @@ end
 
 --update item position
 function update_item_pos(a)
-	if ((a==player and a.dx!=0 or 
-		a.dy!=0) or (a!=player)) then
-		local dx,dy=a.dx,a.dy
-		if a!=player then
-			dx=a.xfacing
-			dy=a.yfacing
-		end
-		a.itmxoff=dx*a.itmoff-hts
-		a.itmyoff=dy*a.itmoff-hts
-		if dx!=0 and dy!=0 then
-			a.itmspridx=3
-		elseif dy!=0 then
-			a.itmspridx=2
+	local dx,dy=a.xfacing,a.yfacing
+	if a==player then
+		if a.dx!=0 or a.dy!=0 then
+			dx=a.dx
+			dy=a.dy
 		else
-			a.itmspridx=1
-		end
-		if dx>0 then
-			a.itmflipx=false
-		elseif dx<0 then
-			a.itmflipx=true
-		end
-		if dy>0 then
-			a.itmflipy=false
-		elseif dy<0 then
-			a.itmflipy=true
+			dx,dy=normalize(a.itmxoff+hts,a.itmyoff+hts)
 		end
 	end
+	
+	--update item offsets
+	a.itmoff=lerp(a.itmoff,a.gitmoff,0.5)
+	a.itmxoff=dx*a.itmoff-hts
+	a.itmyoff=dy*a.itmoff-hts
+	if dx!=0 and dy!=0 then
+		a.itmspridx=3
+	elseif dy!=0 then
+		a.itmspridx=2
+	else
+		a.itmspridx=1
+	end
+	a.itmflipx=dx<0
+	a.itmflipy=dy<0
 end
 
 --time to think
 function time_to_think(a)
 	a.mcnt+=1
-	return (a.mcnt%a.mfreq)==0
+	return (a.mcnt%30)==0
 end
 
 --get nearest target
@@ -1774,6 +1769,12 @@ end
 --damageable
 function dmgable(a)
 	return a.iframes<=0
+end
+
+--use meter
+function use_meter(a,v)
+	a.meter-=v
+	a.cooldwn=a.maxcooldwn
 end
 -->8
 --wraith
@@ -1973,9 +1974,9 @@ end
 --draw spirit plane
 function draw_spirit_plane()
 	local x,y,w,h=camx,camy,
-		ss-ts,ts
+		120,ts
 	color(1)
-	for i=flr(csoff),#spat do
+	for i=flr(csoff),7 do
 		fillp(spat[i])
 		rectfill(x,y,x+w,y+h)
 		x+=w
@@ -2195,8 +2196,8 @@ end
 --renders the human
 function draw_human(human)
 	if player.tier!=1 then
-		draw_actor(human)
 		draw_human_item(human)
+		draw_actor(human)
 	end
 end
 
@@ -2219,12 +2220,14 @@ function init_human_item(human)
 		human.pfragile=true
 		human.pkstr=1
 		human.sfxxaction=16
+		human.itmoff=6
 		
 		--sprites
 		human.itmsprs={16,32,48}
 	--knife
 	else
 		init_melee(human)
+		human.itmoff=8
 		
 		--sprites
 		human.itmsprs={13,14,15}
@@ -2232,8 +2235,8 @@ function init_human_item(human)
 	
 	--item
 	human.itmspridx=1
-	human.itmoff=8
-	human.itmxoff=8-hts
+	human.gitmoff=human.itmoff
+	human.itmxoff=human.itmoff-hts
 	human.itmyoff=-hts
 	human.itmflipx=false
 	human.itmflipy=false
