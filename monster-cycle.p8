@@ -1960,12 +1960,20 @@ end
 function draw_spirit_plane()
 	if player==nil or
 		player.tier==1 then
-		local y=cam.y
-		for i=0,15 do
-			local x=cam.x+i*ts
-			spr(111,x,y)
-			spr(111,x,y+120)
-		end
+		local x,y=cam.x,cam.y
+		color(1)
+		rectfill(x,y,x+ss,y+4)
+		rectfill(x,y+124,x+ss,y+ss)
+		fillp(0b0000000100000100.1)
+		rectfill(x,y+4,x+ss,y+8)
+		rectfill(x,y+120,x+ss,y+124)
+		fillp(▒)
+		rectfill(x,y+8,x+ss,y+12)
+		rectfill(x,y+116,x+ss,y+120)
+		fillp(░)
+		rectfill(x,y+12,x+ss,y+16)
+		rectfill(x,y+112,x+ss,y+116)
+		fillp(█)
 	end
 end
 -->8
