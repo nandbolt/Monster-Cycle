@@ -358,10 +358,10 @@ end
 --math
 
 --constants
-mw=128*8 --map width
-hmw=128*4 --half map width
-mh=128*4 --map height
-hmh=128*2 --half map height
+mw=1024 --map width
+hmw=512 --half map width
+mh=512 --map height
+hmh=256 --half map height
 ss=128 --screen size
 hss=64 --half screen size
 ts=8 --tile size
@@ -2497,14 +2497,14 @@ end
 
 --draw fade out
 function draw_fadeout()
-	local r=(hss+28)*(1-(fade/30))
+	local r=92*(1-(fade/30))
 	circfill(cam.x+hss,
 		cam.y+hss,r,2)
 end
 
 --draw fade in
 function draw_fadein()
-	local r=(hss+28)*(fade/30)
+	local r=92*(fade/30)
 	circfill(cam.x+hss,
 		cam.y+hss,r,2)
 end
