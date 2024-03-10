@@ -308,17 +308,17 @@ function _draw()
 			local xx,yy=cam.x+16,cam.y+33
 			
 			--death prompt
-			oprint("more than death.",
+			oprint("mORE THAN DEATH.",
 				xx,yy,8,1)
 			
 			--tip
 			yy+=24
-			oprint("tip:\n"..tip,
+			oprint("tIP:\n"..tip,
 				xx,yy,7,1)
 			
 			--restart prompt
 			yy+=40
-			oprint("❎/x to retry",
+			oprint("❎/x TO RETRY",
 				xx,yy,10,1)
 		--victory menu
 		elseif gstate==gst_complete then
@@ -337,12 +337,12 @@ function _draw()
 				c=10
 				nh="(new high!)"
 			end
-			oprint("time:"..seconds..nh,
+			oprint("tIME:"..seconds..nh,
 				xx,yy,c,1)
 			
 			--restart prompt
 			yy+=40
-			oprint("❎/x to play again",
+			oprint("❎/x TO PLAY AGAIN",
 				xx,yy,7,1)
 		end
 		
@@ -786,6 +786,7 @@ function init_actor(a,x,y,is_player)
 	a.xfacing=1 --x facing direction
 	a.yfacing=0 --y facing direction
 	a.inview=false --in camera view
+	a.msty=false --monstrosity
 	
 	--movement
 	a.x=x --x position
@@ -1083,7 +1084,9 @@ end
 function update_trail(a)
 	if a.inview then
 		if a.trailon or a.xp>=a.maxxp then
-			if a.xp>=a.maxxp then
+			if a.msty then
+				update_msty_trail(a)
+			elseif a.xp>=a.maxxp then
 				a.ctrail=10
 			elseif a.dashing then
 				a.ctrail=a.dashctrail
@@ -1150,7 +1153,9 @@ function update_dash(a)
 			not oa.dashing then
 			knockback(oa,oa.x-a.x,
 				oa.y-a.y,a.spd)
-			dmg_actor(oa,1)
+			local dmg=1
+			if (a.msty) dmg=999
+			dmg_actor(oa,dmg)
 		end
 	else
 		a.maxspd=a.normspd
@@ -1194,7 +1199,9 @@ function update_run(a)
 		if oa!=nil and dmgable(oa) then
 			knockback(oa,oa.x-a.x,
 				oa.y-a.y,a.spd*1.5)
-			dmg_actor(oa,1)
+			local dmg=1
+			if (a.msty) dmg=999
+			dmg_actor(oa,dmg)
 		end
 	end
 end
@@ -1223,6 +1230,12 @@ function actor_kill(a)
 		else
 			spawn_hp(xx,yy,na)
 		end
+	end
+	
+	--drop monstrosity
+	if rnd(1)<0.1 then
+		local xx,yy=x+rnd(1)*ts-hts,y+rnd(1)*ts-hts
+		spawn_msty(xx,yy,na)
 	end
 end
 
@@ -1591,7 +1604,9 @@ function update_melee(a)
 	if oa!=nil and dmgable(oa) then
 		knockback(oa,oa.x-a.x,
 			oa.y-a.y,4+a.spd)
-		dmg_actor(oa,a.melee.dmg)
+		local dmg=a.melee.dmg
+		if (a.msty) dmg=999
+		dmg_actor(oa,dmg)
 	end
 end
 
@@ -1903,11 +1918,9 @@ spnr.x=0 --spawner x
 spnr.y=0 --spawner y
 spnr.cnt=0 --spawn counter
 spnr.freq=30 --spawn frequency
-spnr.maxghosts=6 --max ghost spawns
-spnr.maxwraiths=4 --max wraith spawns
-spnr.maxzombies=8 --max zombie spawns
-spnr.maxskeletons=6 --max skeleton spawns
-spnr.maxhumans=8 --max human spawns
+spnr.maxspirits=6
+spnr.maxundead=12
+spnr.maxhumans=8
 
 --update spawn point
 function update_spawnpoint(ethereal)
@@ -1943,21 +1956,25 @@ end
 function update_spawner()
 	spnr.cnt+=1
 	if gstate==gst_active and 
-		spnr.cnt%spnr.freq==0 then 
-		local n=irnd(0,4)
-		if n==0 and #ghosts<spnr.maxghosts then
+		spnr.cnt%spnr.freq==0 then
+		if #ghosts+#wraiths<spnr.maxspirits then
+			--spawn spirit
 			update_spawnpoint(true)
-			make_ghost(spnr.x,spnr.y,false)
-		elseif #wraiths<spnr.maxwraiths then
-			update_spawnpoint(true)
-			make_wraith(spnr.x,spnr.y,false)
-		elseif #zombies<spnr.maxzombies then
+			if rnd(1)<0.4 then
+				make_wraith(spnr.x,spnr.y,false)
+			else
+				make_ghost(spnr.x,spnr.y,false)
+			end
+		elseif #zombies+#skeletons<spnr.maxundead then
+			--spawn undead
 			update_spawnpoint(false)
-			make_zombie(spnr.x,spnr.y,false)
-		elseif #skeletons<spnr.maxskeletons then
-			update_spawnpoint(false)
-			make_skeleton(spnr.x,spnr.y,false)
+			if rnd(1)<0.4 then
+				make_skeleton(spnr.x,spnr.y,false)
+			else
+				make_zombie(spnr.x,spnr.y,false)
+			end
 		elseif #humans<spnr.maxhumans then
+			--spawn human
 			update_spawnpoint(false)
 			make_human(spnr.x,spnr.y,false)
 		end
@@ -2260,6 +2277,7 @@ function spawn_proj(a,x,y,dx,dy,burst)
 	local proj={}
 	proj.owner=a
 	proj.targs=a.targs
+	proj.msty=a.msty
 	
 	--dimensions
 	proj.bbhw=a.psize --bounding box half width
@@ -2308,6 +2326,7 @@ end
 --update projectile trail
 function update_proj_trail(p)
 	if p.inview then
+		if (p.msty) update_msty_trail(p)
 		add_p(p.x+irnd(-p.bbhw,p.bbhw),
 			p.y+irnd(-p.bbhh,p.bbhh),p.ctrail)
 	end
@@ -2336,7 +2355,9 @@ function update_proj(p)
 		not oa.dashing then
 		knockback(oa,oa.x-p.x,
 			oa.y-p.y,p.kstr)
-		dmg_actor(oa,p.dmg)
+		local dmg=p.dmg
+		if (p.msty) dmg=999
+		dmg_actor(oa,dmg)
 		collision=true
 	end
 	
@@ -2638,6 +2659,7 @@ function init_collectable(c,x,y)
 	--draw
 	c.spr=62
 	c.col=9
+	c.draw=draw_dot_collectable
 	
 	--input
 	c.dx=0 --x direction
@@ -2674,10 +2696,20 @@ end
 
 --draw collectable
 function draw_collectable(c)
-	--spr(c.spr,c.x,c.y)
+	c.draw(c)
+end
+
+--draw collectable
+function draw_dot_collectable(c)
 	local col=c.col
 	if (c.owner==player) col=5
 	circfill(c.x,c.y,1,col)
+end
+
+--draw collectable
+function draw_spr_collectable(c)
+	update_msty_trail(c)
+	spr(c.spr,c.x-hts,c.y-hts)
 end
 
 --collect
@@ -2745,6 +2777,7 @@ function spawn_maxhp(x,y,owner)
 	maxhp.col=14
 	maxhp.ctrail=8
 	maxhp.owner=owner
+	maxhp.life=300
 	
 	--add to pool
 	add(collectables,maxhp)
@@ -2755,6 +2788,33 @@ function collect_maxhp(a,maxhp)
 	a.maxhp+=1
 	a.hp+=1
 	collect(a,maxhp)
+end
+
+--spawn monstrosity
+function spawn_msty(x,y,owner)
+	local msty={}
+	init_collectable(msty,x,y)
+	msty.collect=collect_msty
+	msty.owner=owner
+	msty.draw=draw_spr_collectable
+	msty.bbhw=4
+	msty.bbhh=4
+	msty.life=300
+	
+	--add to pool
+	add(collectables,msty)
+end
+
+--collect monstrosity
+function collect_msty(a,msty)
+	a.msty=true
+	a.trailon=true
+	collect(a,msty)
+end
+
+--update monstrosity trail
+function update_msty_trail(e)
+	e.ctrail=irnd(0,15)
 end
 __gfx__
 00000000000111000001100000110000001111000010010000151000111fff5100111151015f11111dddddd11dd11dd11d1111d1001000000001510015151000
