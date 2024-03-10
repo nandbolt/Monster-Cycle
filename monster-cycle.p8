@@ -4,15 +4,6 @@ __lua__
 --monster cycle(v0.9.3)
 --by nandbolt
 
---music--
-music_artist="@jAMAILmUSIC"
-music_credits_color=12
-music_mainmenu=40
-music_ghost=44
-music_undead=48
-music_human=52
----------
-
 --sfxs--
 sfx_kill=3
 sfx_hurt=3
@@ -123,7 +114,7 @@ function _init()
 	if gstate==gst_menu then
 		mmx=irnd(0,(mw-ss)/ts)
 		mmy=irnd(0,(mh-ss)/ts)
-		pmusic(music_mainmenu)
+		pmusic(40)
 		load_highscore()
 	else
 		--clear run
@@ -223,7 +214,7 @@ function _update()
 		--help menu
 		if btnp(5) then
 			gstate=gst_active
-			pmusic(music_ghost)
+			pmusic(44)
 			_init()
 			sfx(sfx_gamestart)
 		end
@@ -1265,7 +1256,7 @@ function ascend(a)
 		
 		--undead music
 		if is_player then
-			pmusic(music_undead)
+			pmusic(48)
 		end
 	--to tier 3
 	elseif a.tier+1==3 then
@@ -1273,7 +1264,7 @@ function ascend(a)
 		
 		--human music
 		if is_player then
-			pmusic(music_human)
+			pmusic(52)
 		end
 	--to tier 4
 	elseif a.tier+1==4 then
@@ -1433,7 +1424,7 @@ function descend(a)
 		
 		--undead music
 		if is_player then
-			pmusic(music_undead)
+			pmusic(48)
 		end
 	--to tier 1
 	elseif a.tier-1==1 then
@@ -1446,7 +1437,7 @@ function descend(a)
 		
 		--ghost music
 		if is_player then
-			pmusic(music_ghost)
+			pmusic(44)
 		end
 	--to tier 0
 	elseif a.tier-1==0 then
@@ -2454,8 +2445,8 @@ function draw_mainmenu()
 	--credits
 	oprint("gAME BY nandbolt (V"..vnum..")",
 		13,114,6,1)
-	oprint("mUSIC BY "..music_artist,
-		21,105,music_credits_color,1)
+	oprint("mUSIC BY @jAMAILmUSIC",
+		21,105,12,1)
 	
 	--fade
 	if (mmstart) draw_fadeout()
