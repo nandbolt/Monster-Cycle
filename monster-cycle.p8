@@ -4,41 +4,11 @@ __lua__
 --monster cycle(v0.9.3)
 --by nandbolt
 
---sfxs--
-sfx_kill=3
-sfx_hurt=3
-sfx_collect=1
-sfx_ascend=7
-sfx_ghostdash=9
-sfx_ghostblast=11
-sfx_wraithdash=0
-sfx_wraithblast=10
-sfx_zombiecharge=14
-sfx_zombiebreath=12
-sfx_skeletonthrow=13
-sfx_humandash=15
-sfx_pistolshot=16
-sfx_gamestart=1
-sfx_highscore=8
----------
-
 --game state
 gstate=0
 gtime=0 --game time (steps)
 ghigh=0 --high score (steps)
 vnum="0.9.3"
-debug_mode=false
-
---pools
-ghosts={}
-wraiths={}
-zombies={}
-skeletons={}
-humans={}
-projs={} --projectiles
-ps={} --low particle system
-ps2={} --high particle system
-collectables={}
 
 --camera
 cam={}
@@ -207,7 +177,7 @@ function _update()
 			mmstart=true
 			fade=mmfade
 			delay=mmdelay
-			sfx(sfx_gamestart)
+			sfx(1)
 			pmusic(-1) --stop music
 		end
 	elseif gstate==gst_help then
@@ -216,7 +186,7 @@ function _update()
 			gstate=gst_active
 			pmusic(44)
 			_init()
-			sfx(sfx_gamestart)
+			sfx(1)
 		end
 	else
 		--update spawner
@@ -253,7 +223,7 @@ function _update()
 			elseif btnp(5) then
 				mmstart=true
 				fade=mmfade
-				sfx(sfx_gamestart)
+				sfx(1)
 			end
 		--active state
 		else
@@ -507,7 +477,7 @@ function make_ghost(x,y,is_player)
 	init_trail(ghost,12)
 	
 	--dash
-	init_dash(ghost,3,1,sfx_ghostdash)
+	init_dash(ghost,3,1,9)
 	
 	--blaster
 	init_ghost_blaster(ghost)
@@ -564,7 +534,7 @@ function init_ghost_blaster(ghost)
 	ghost.pburst=1
 	ghost.psize=1
 	ghost.pethereal=true
-	ghost.sfxxaction=sfx_ghostblast
+	ghost.sfxxaction=11
 end
 
 --enter ghost wander state
@@ -683,7 +653,7 @@ function make_zombie(x,y,is_player)
 	zombie.sprs=zombie.rsprs
 	
 	--dash
-	init_run(zombie,4,sfx_zombiecharge)
+	init_run(zombie,4,14)
 	
 	--blaster
 	init_zombie_blaster(zombie)
@@ -1200,7 +1170,7 @@ end
 --actor kill
 function actor_kill(a)
 	--kill sound
-	if (a.inview) sfx(sfx_kill)
+	if (a.inview) sfx(3)
 	
 	--descend
 	local x,y=a.x,a.y
@@ -1244,7 +1214,7 @@ end
 --ascend
 function ascend(a)
 	local is_player=a==player
-	if (a.inview) sfx(sfx_ascend)
+	if (a.inview) sfx(7)
 	
 	--to tier 2
 	if a.tier+1==2 then
@@ -1274,7 +1244,7 @@ function ascend(a)
 			mmstart=false
 			if gtime<ghigh or ghigh==0 then
 				save_highscore(gtime)
-				sfx(sfx_highscore)
+				sfx(8)
 			end
 		end
 	end
@@ -1767,7 +1737,7 @@ function dmg_actor(a,dmg)
 	else
 		a.iframes=30
 		if a.inview then
-			sfx(sfx_hurt)
+			sfx(3)
 		end
 	end
 end
@@ -1803,7 +1773,7 @@ function make_wraith(x,y,is_player)
 	init_trail(wraith,5)
 	
 	--dash
-	init_dash(wraith,4,8,sfx_wraithdash)
+	init_dash(wraith,4,8,0)
 	
 	--blaster
 	init_wraith_blaster(wraith)
@@ -1875,7 +1845,7 @@ function init_wraith_blaster(wraith)
 	wraith.pethereal=true
 	wraith.pdmg=2
 	wraith.pkstr=4
-	wraith.sfxxaction=sfx_wraithblast
+	wraith.sfxxaction=10
 end
 
 --enter wraith wander state
@@ -2091,8 +2061,8 @@ function init_skeleton_blaster(skeleton)
 	skeleton.pbounce=true
 	skeleton.pdraw=draw_skeleton_proj
 	skeleton.psprs={30,46,31,46}
-	skeleton.sfxoaction=sfx_skeletonthrow
-	skeleton.sfxxaction=sfx_skeletonthrow
+	skeleton.sfxoaction=13
+	skeleton.sfxxaction=13
 end
 
 --enter skeleton wander state
@@ -2152,7 +2122,7 @@ function make_human(x,y,is_player)
 	init_run(human,3)
 	human.contactdmg=false
 	human.burststr=2
-	human.sfxoaction=sfx_humandash
+	human.sfxoaction=15
 	
 	--item
 	init_human_item(human)
@@ -2221,7 +2191,7 @@ function init_human_item(human)
 		human.pcost=15
 		human.pfragile=true
 		human.pkstr=1
-		human.sfxxaction=sfx_pistolshot
+		human.sfxxaction=16
 		
 		--sprites
 		human.itmsprs={16,32,48}
@@ -2529,43 +2499,43 @@ end
 
 --draw hud
 function draw_hud()
-	local xx,yy=cam.x+2,cam.y+2
+	local camx,camy=cam.x,cam.y
+	local xx,yy=camx+12,camy+4
 	
-	--debug
-	--cursor(cam.x+2,cam.y+hss)
-	--print("collectables:"..#collectables)
-	
-	--hp
-	shdwbar(xx+10,yy+2,32,2,
+	--bars
+	shdwbar(xx,yy,32,2,
 		player.hp/player.maxhp,8)
-	shdwprint("♥",xx,yy,8)
-	draw_bardivs(xx+10,yy+2,
+	draw_bardivs(xx,yy,
 		player.maxhp)
-	
-	--xp
 	yy+=8
-	shdwbar(xx+10,yy+2,32,2,
+	shdwbar(xx,yy,32,2,
 		player.xp/player.maxxp,10)
-	shdwprint("xp",xx,yy,10)
-	draw_bardivs(xx+10,yy+2,
+	draw_bardivs(xx,yy,
 		player.maxxp)
-	
-	--meter
 	yy+=8
-	shdwbar(xx+10,yy+2,32,2,
+	shdwbar(xx,yy,32,2,
 		player.meter/player.maxmeter,
 		7)
-	shdwprint("★",xx,yy,7)
+	yy+=2
 	local v=1-player.cooldwn/
 		player.maxcooldwn
 	if v>0 then
-		rectfill(xx+10,yy+4,
-			xx+10+flr(clamp(32*v,0,32)),
-			yy+4,13)
+		rectfill(xx,yy,
+			xx+flr(clamp(32*v,0,32)),
+			yy,13)
 	end
 	
+	--prints
+	xx=camx+2
+	yy=camy+2
+	shdwprint("♥",xx,yy,8)
+	yy+=8
+	shdwprint("xp",xx,yy,10)
+	yy+=8
+	shdwprint("★",xx,yy,7)
+	
 	--controls
-	yy=cam.y+116
+	yy=camy+116
 	local c1,c2=13,13
 	if (player.oaction) c1=12
 	if (player.xaction) c2=14
@@ -2577,7 +2547,7 @@ function draw_hud()
 	
 	--goal
 	xx+=48
-	yy=cam.y+2
+	yy=camy+2
 	c1=7
 	if (player.xp>=player.maxxp) c1=10
 	shdwprint(player.goal,
@@ -2728,7 +2698,7 @@ end
 --collect
 function collect(a,c)
 	--kill sound
-	if (c.inview) sfx(sfx_collect)
+	if (c.inview) sfx(1)
 	del(collectables,c)
 end
 
