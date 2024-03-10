@@ -8,13 +8,16 @@ __lua__
 gstate=0
 gtime=0 --game time (steps)
 ghigh=0 --high score (steps)
-vnum="0.9.3"
 
 --camera
-cam={}
-cam.x=0 --camera x
-cam.y=0 --camera y
-cam.accel=1 --camera acceleration
+camx=0 --camera x
+camy=0 --camera y
+camaccel=1 --camera acceleration
+
+--spawner
+spnrx=0 --spawner x
+spnry=0 --spawner y
+spnr_cnt=0 --spawn counter
 
 --collisions
 walls={}
@@ -30,9 +33,7 @@ mmtimer=0
 mmx=0
 mmy=0
 mmstart=false
-mmdelay=30
-mmfade=30
-mmomega=1/360
+mmomega=0.002778
 
 --delay
 delay=0
@@ -50,6 +51,11 @@ ctarg={7}
 
 --title
 tcols={0,1,2,8}
+
+--spirit plane
+spat={█,█,█,6730.5,▒,▒,░}
+csoff=1 --current spirit offset
+gsoff=1 --goal spirit offset
 
 --help
 tips={
@@ -77,29 +83,29 @@ tips={
 
 --init
 function _init()
+	--clear pools
+	ghosts={}
+	wraiths={}
+	zombies={}
+	skeletons={}
+	humans={}
+	projs={}
+	ps={}
+	ps2={}
+	collectables={}
+	
 	--generate tip
 	tip=tips[irnd(1,#tips)]
 	
 	--not menu state
 	if gstate==gst_menu then
-		mmx=irnd(0,(mw-ss)/ts)
-		mmy=irnd(0,(mh-ss)/ts)
+		mmx=irnd(0,112)
+		mmy=irnd(0,48)
 		pmusic(40)
 		load_highscore()
 	else
 		--clear run
 		gtime=0
-		
-		--clear pools
-		ghosts={}
-		wraiths={}
-		zombies={}
-		skeletons={}
-		humans={}
-		projs={}
-		ps={}
-		ps2={}
-		collectables={}
 		
 		--reset fade
 		fade=30
@@ -139,12 +145,12 @@ function _init()
 		--add player
 		update_spawnpoint(false)
 		if half_chance() then
-			make_ghost(spnr.x,spnr.y,true)
+			make_ghost(spnrx,spnry,true)
 		else
-			make_wraith(spnr.x,spnr.y,true)
+			make_wraith(spnrx,spnry,true)
 		end
 		player.iframes=90
---		make_human(spnr.x,spnr.y,true)
+--		make_human(spnrx,spnry,true)
 --		player.xp=3
 --		player.maxhp=16
 --		player.hp=player.maxhp
@@ -156,6 +162,9 @@ function _update()
 	--fog
 	update_fog()
 	
+	--lerp spirit offset
+	csoff=lerp(csoff,gsoff,0.1)
+	
 	--update particles
 	foreach(ps,update_p)
 	foreach(ps2,update_p)
@@ -166,7 +175,7 @@ function _update()
 		if mmstart then
 			if fade<=0 then
 				gstate=gst_help
-				mmomega=1/360
+				mmomega=0.002778
 			elseif delay<=0 then
 				fade-=1
 			else
@@ -175,8 +184,8 @@ function _update()
 			mmomega=lerp(mmomega,0,0.1)
 		elseif btnp(5) then
 			mmstart=true
-			fade=mmfade
-			delay=mmdelay
+			fade=30
+			delay=30
 			sfx(1)
 			pmusic(-1) --stop music
 		end
@@ -202,13 +211,13 @@ function _update()
 		foreach(collectables,update_collectable)
 		
 		--update camera
-		cam.x=lerp(cam.x,player.x-hss,
-			cam.accel)
-		cam.x=clamp(cam.x,0,mw-ss)
-		cam.y=lerp(cam.y,player.y-hss,
-			cam.accel)
-		cam.y=clamp(cam.y,0,mh-ss)
-		camera(cam.x,cam.y)
+		camx=lerp(camx,player.x-hss,
+			camaccel)
+		camx=clamp(camx,0,mw-ss)
+		camy=lerp(camy,player.y-hss,
+			camaccel)
+		camy=clamp(camy,0,mh-ss)
+		camera(camx,camy)
 		
 		--dead state
 		if gstate==gst_dead or
@@ -222,7 +231,7 @@ function _update()
 				end
 			elseif btnp(5) then
 				mmstart=true
-				fade=mmfade
+				fade=30
 				sfx(1)
 			end
 		--active state
@@ -247,20 +256,22 @@ function _draw()
 		--draw tiles
 		map(0,0,0,0,mw,mh)
 		
-		--draw spirit plane
+		--spirit plane
 		draw_spirit_plane()
 		
-		--draw pools
-		foreach(ps,draw_p) --low particles
-		foreach(collectables,draw_collectable)
-		foreach(ghosts,draw_ghost)
-		foreach(wraiths,draw_wraith)
+		--ground
+		foreach(ps,draw_p)
 		foreach(zombies,draw_zombie)
 		foreach(skeletons,draw_skeleton)
 		foreach(humans,draw_human)
-		foreach(projs,draw_proj) --high particles
+		foreach(projs,draw_proj)
+		foreach(collectables,draw_collectable)
 		
-		--draw high particles
+		--spirits
+		foreach(ghosts,draw_ghost)
+		foreach(wraiths,draw_wraith)
+		
+		--sky
 		foreach(ps2,draw_p2)
 		
 		--active state
@@ -269,7 +280,7 @@ function _draw()
 			draw_targ_line()
 		--death menu
 		elseif gstate==gst_dead then
-			local xx,yy=cam.x+16,cam.y+33
+			local xx,yy=camx+16,camy+33
 			
 			--death prompt
 			oprint("mORE THAN DEATH.",
@@ -286,7 +297,7 @@ function _draw()
 				xx,yy,10,1)
 		--victory menu
 		elseif gstate==gst_complete then
-			local xx,yy=cam.x+33,cam.y+17
+			local xx,yy=camx+33,camy+17
 			mmtimer+=1
 			
 			--victory prompt
@@ -391,8 +402,8 @@ end
 
 --point in view
 function point_in_view(x,y)
-	if x>cam.x and x<cam.x+ss and
-		y>cam.y and y<cam.y+ss then
+	if x>camx and x<camx+ss and
+		y>camy and y<camy+ss then
 		return true
 	end
 	return false
@@ -529,7 +540,7 @@ end
 function init_ghost_blaster(ghost)
 	init_blaster(ghost)
 	ghost.pc1=12
-	ghost.pc2=1
+	ghost.pc2=12
 	ghost.paccel=0.05
 	ghost.pburst=1
 	ghost.psize=1
@@ -561,24 +572,28 @@ end
 -->8
 --particles
 
---add particle (low)
-function add_p(x,y,c)
-	local p={}
+--init particle
+function init_p(p,x,y,c)
 	p.x,p.y=x,y
 	p.vx,p.vy=0,0
 	p.life=10
 	p.c=c
 	p.sys=ps
+end
+
+--add particle (low)
+function add_p(x,y,c)
+	local p={}
+	init_p(p,x,y,c)
 	add(ps,p)
 end
 
 --add particle (high)
 function add_p2(x,y,c)
 	local p={}
-	p.x,p.y=x,y
+	init_p(p,x,y,c)
 	p.vx,p.vy=(rnd(1)-0.5)*0.5,(rnd(1)-0.5)*0.5
 	p.life=90
-	p.c=c
 	p.sys=ps2
 	add(ps2,p)
 end
@@ -1039,6 +1054,7 @@ function init_trail(a,c)
 	a.normctrail=c --normal trail color
 	a.ctrail=a.normctrail --trail color
 	a.trailon=true --trail on
+	a.tps=ps --trail particle system
 end
 
 --update trail
@@ -1228,6 +1244,9 @@ function ascend(a)
 		if is_player then
 			pmusic(48)
 		end
+		
+		--update spirit plane
+		gsoff=8.5
 	--to tier 3
 	elseif a.tier+1==3 then
 		make_human(a.x,a.y,is_player)
@@ -1409,6 +1428,9 @@ function descend(a)
 		if is_player then
 			pmusic(44)
 		end
+		
+		--update spirit plane
+		gsoff=1
 	--to tier 0
 	elseif a.tier-1==0 then
 		if is_player then
@@ -1735,7 +1757,7 @@ function dmg_actor(a,dmg)
 	if a.hp<=0 then
 		actor_kill(a)
 	else
-		a.iframes=30
+		a.iframes=15
 		if a.inview then
 			sfx(3)
 		end
@@ -1871,14 +1893,6 @@ function wraith_flee(wraith)
 end
 -->8
 --spawner
-spnr={}
-spnr.x=0 --spawner x
-spnr.y=0 --spawner y
-spnr.cnt=0 --spawn counter
-spnr.freq=30 --spawn frequency
-spnr.maxspirits=6
-spnr.maxundead=12
-spnr.maxhumans=8
 
 --update spawn point
 function update_spawnpoint(ethereal)
@@ -1902,8 +1916,8 @@ function update_spawnpoint(ethereal)
 			tx+=1
 		else
 			--spawn good!
-			spnr.x=tx*ts+hts
-			spnr.y=ty*ts+hts
+			spnrx=tx*ts+hts
+			spnry=ty*ts+hts
 			break
 		end
 		iter+=1
@@ -1912,29 +1926,29 @@ end
 
 --update spawner
 function update_spawner()
-	spnr.cnt+=1
+	spnr_cnt+=1
 	if gstate==gst_active and 
-		spnr.cnt%spnr.freq==0 then
-		if #ghosts+#wraiths<spnr.maxspirits then
+		spnr_cnt%30==0 then
+		if #ghosts+#wraiths<6 then
 			--spawn spirit
 			update_spawnpoint(true)
 			if rnd(1)<0.4 then
-				make_wraith(spnr.x,spnr.y,false)
+				make_wraith(spnrx,spnry,false)
 			else
-				make_ghost(spnr.x,spnr.y,false)
+				make_ghost(spnrx,spnry,false)
 			end
-		elseif #zombies+#skeletons<spnr.maxundead then
+		elseif #zombies+#skeletons<12 then
 			--spawn undead
 			update_spawnpoint(false)
 			if rnd(1)<0.4 then
-				make_skeleton(spnr.x,spnr.y,false)
+				make_skeleton(spnrx,spnry,false)
 			else
-				make_zombie(spnr.x,spnr.y,false)
+				make_zombie(spnrx,spnry,false)
 			end
-		elseif #humans<spnr.maxhumans then
+		elseif #humans<8 then
 			--spawn human
 			update_spawnpoint(false)
-			make_human(spnr.x,spnr.y,false)
+			make_human(spnrx,spnry,false)
 		end
 	end
 end
@@ -1952,29 +1966,34 @@ end
 
 --spawn fog
 function spawn_fog()
-	local x,y=cam.x+rnd(ss),cam.y+rnd(ss)
+	local x,y=camx+rnd(ss),camy+rnd(ss)
 	add_p2(x,y,cfog[irnd(1,#cfog)])
 end
 
 --draw spirit plane
 function draw_spirit_plane()
-	if player==nil or
-		player.tier==1 then
-		local x,y=cam.x,cam.y
-		color(1)
-		rectfill(x,y,x+ss,y+4)
-		rectfill(x,y+124,x+ss,y+ss)
-		fillp(0b0000000100000100.1)
-		rectfill(x,y+4,x+ss,y+8)
-		rectfill(x,y+120,x+ss,y+124)
-		fillp(▒)
-		rectfill(x,y+8,x+ss,y+12)
-		rectfill(x,y+116,x+ss,y+120)
-		fillp(░)
-		rectfill(x,y+12,x+ss,y+16)
-		rectfill(x,y+112,x+ss,y+116)
-		fillp(█)
+	local x,y,w,h=camx,camy,
+		ss-ts,ts
+	color(1)
+	for i=flr(csoff),#spat do
+		fillp(spat[i])
+		rectfill(x,y,x+w,y+h)
+		x+=w
+		w,h=h,w
+		rectfill(x,y,x+w,y+h)
+		y+=h
+		x-=h-w
+		w,h=h,w
+		rectfill(x,y,x+w,y+h)
+		x-=h
+		y-=w-h
+		w,h=h,w
+		rectfill(x,y,x+w,y+h)
+		x+=ts
+		w,h=h,w
+		w-=ts*2
 	end
+	fillp(█)
 end
 -->8
 --skeleton
@@ -2421,7 +2440,7 @@ function draw_mainmenu()
 		0,4),10,1)
 	
 	--credits
-	oprint("gAME BY nandbolt (V"..vnum..")",
+	oprint("gAME BY nandbolt (V1.0.0)",
 		13,114,6,1)
 	oprint("mUSIC BY @jAMAILmUSIC",
 		21,105,12,1)
@@ -2480,15 +2499,15 @@ end
 --draw fade out
 function draw_fadeout()
 	local r=92*(1-(fade/30))
-	circfill(cam.x+hss,
-		cam.y+hss,r,1)
+	circfill(camx+hss,
+		camy+hss,r,1)
 end
 
 --draw fade in
 function draw_fadein()
 	local r=92*(fade/30)
-	circfill(cam.x+hss,
-		cam.y+hss,r,1)
+	circfill(camx+hss,
+		camy+hss,r,1)
 end
 
 --shadow bar
@@ -2507,7 +2526,6 @@ end
 
 --draw hud
 function draw_hud()
-	local camx,camy=cam.x,cam.y
 	local xx,yy=camx+12,camy+4
 	
 	--bars
@@ -2560,20 +2578,21 @@ function draw_hud()
 	if (player.xp>=player.maxxp) c1=10
 	shdwprint(player.goal,
 		xx,yy,c1)
-	
+		
 	--highscore
---	local hseconds=flr(ghigh/30)
---	if (ghigh==0) hseconds="none"
---	xx+=90
---	yy=cam.y+2
---	shdwprint("high:"..hseconds,
---		xx,yy,10)
+	local hseconds=flr(ghigh/30)
+	if (ghigh==0) hseconds="none"
+	local tm=hseconds.."⧗h"
+	yy=camy+116
+	xx=camx+123-#tm*4
+	shdwprint(tm,xx,yy,10)
 	
 	--timer
---	yy+=8
---	local seconds=flr(gtime/30)
---	shdwprint("time:"..seconds,
---		xx,yy,7)
+	yy-=8
+	local seconds=flr(gtime/30)
+	tm=seconds.."⧗c"
+	xx=camx+123-#tm*4
+	shdwprint(tm,xx,yy,7)
 end
 
 --draw help menu
@@ -2678,6 +2697,10 @@ end
 
 --draw collectable
 function draw_collectable(c)
+	if c.life<30 and
+		c.life%2==0 then
+		return
+	end
 	c.draw(c)
 end
 
@@ -2816,14 +2839,14 @@ __gfx__
 0070070001cc11c11c1cc1c101c1ccd1155557d1177557710157dd1015fff151151ff15f15f1ff51d111111dd516615d16111161015111100015651001015751
 00000000001ccc1001cddc10001c1d100155771001d11d1000177100015555f51f55551515555510d555555dd556655dd165561d001000000015751000001510
 0000000000011100001111000001110000111100001001000001100000155111151111011551f5101dddddd11dd11dd11d1111d1000000000001510000000100
-00000000000000000000000000000000001111000010010000151000001551111511110000111111d444444444444444addddddddddddddd0001010001000100
-01111110000111000001100000110000015588100151151001555100015555f51f55551011555555155555555555555fc555555555555557001d1d101d111d10
-155555510011cc10001111000111110015555891155555511555551015fff15115ffff5155ffff551677615111115115c6776c5ccccc5cc501d7d7d1d7ddd7d1
-54444815011111200111111001111c1001555510155555515555588115ffff51f5ffff55f5fff1511767611111111115c7676cccccccccc5001d7d101d777d10
-545d55510111112001c11c10001111c001555510185555811555598115ffff51f5ffff5515ffff5f1767611111111115c7676cccccccccc5001d7d10d7ddd7d1
-54d111100011cc1001c11c10001c112015555891188558810158991015fff151f51ff15115f1ff551677611115111115c6776cccc5ccccc5001d7d101d111d10
-1510000000011100001221000001c2000155881001911910001881005f555510515555f11f5555111555555555555551c55555555555555101d7d7d101000100
-01000000000000000000000000000000001111000010010000011000111fff51101111511ff51100d111111111111114a11111111111111d001d1d1000000000
+00000000000ccc00000cc00000cc0000001111000010010000151000001551111511110000111111d444444444444444addddddddddddddd0001010001000100
+0111111000c111c000c11c000c11cc00015588100151151001555100015555f51f55551011555555155555555555555fc555555555555557001d1d101d111d10
+155555510c11cc1c0c1111c0c11111c015555891155555511555551015fff15115ffff5155ffff551677615111115115c6776c5ccccc5cc501d7d7d1d7ddd7d1
+54444815c111112cc111111cc1111c1c01555510155555515555588115ffff51f5ffff55f5fff1511767611111111115c7676cccccccccc5001d7d101d777d10
+545d5551c111112cc1c11c1c0c1111cc01555510185555811555598115ffff51f5ffff5515ffff5f1767611111111115c7676cccccccccc5001d7d10d7ddd7d1
+54d111100c11cc1cc1c11c1c0c1c112c15555891188558810158991015fff151f51ff15115f1ff551677611115111115c6776cccc5ccccc5001d7d101d111d10
+1510000000c111c00c1221c000c1c2c00155881001911910001881005f555510515555f11f5555111555555555555551c55555555555555101d7d7d101000100
+01000000000ccc0000cccc00000ccc00001111000010010000011000111fff51101111511ff51100d111111111111114a11111111111111d001d1d1000000000
 00111000111bbb51001111510015b11101dd77d101dddd1001dddd11111444510011115101541111d222222d44444f44aeeeeeeaddddd7dd001100001dd11dd1
 015551005b555510015555b1015555bb1d77dd101d7777d11d717dd754555510015555410155554415677651ffffffff156776517777777701d71000d516615d
 1544451015bbb85115bbbb5115bbbb5bd7117dd1d717717dd77717d71544415115444451154444544576675446a66664d576675dd1a1111d1d7d1000d516615d
