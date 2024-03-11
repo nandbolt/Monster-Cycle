@@ -91,8 +91,7 @@ function _init()
 	collectables={}
 	
 	--generate tip
---	tip=tips[irnd(1,#tips)]
-	tip=tips[16]
+	tip=tips[irnd(1,#tips)]
 	
 	--not menu state
 	if gstate==gst_menu then
