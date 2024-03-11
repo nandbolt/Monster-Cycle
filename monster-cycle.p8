@@ -21,7 +21,7 @@ spnr_cnt=0 --spawn counter
 
 --collisions
 walls={}
-for i=1,128-112 do
+for i=1,16 do
 	walls[i]=i+111
 end
 tombs={10,11,12,47,63}
@@ -418,18 +418,10 @@ end
 --check rectangle intersection
 function rect_intersect(ax1,ay1,ax2,ay2,bx1,by1,bx2,by2)
 	--zero area
-	if (ax1==ax2 or ay1==ay2 or
-		bx1==bx2 or by1==by2) then
-		return false
-	end
-	
-	--horizontal check
-	if (ax1>bx2 or ax2<bx1) then
-		return false
-	end
-	
-	--vertical check
-	if (ay1>by2 or ay2<by1) then
+	if (ax1==ax2 or ay1==ay2 or --zero area
+		bx1==bx2 or by1==by2 or
+		ax1>bx2 or ax2<bx1 or --horizontal check
+		ay1>by2 or ay2<by1) then --vertical
 		return false
 	end
 	
@@ -512,6 +504,9 @@ function make_ghost(x,y,is_player)
 		ghost.fight=ghost_fight
 		ghost.flee=ghost_flee
 	end
+	
+	--health
+	set_maxhp(ghost,2)
 	
 	--add to list
 	ghost.pool=ghosts
@@ -806,12 +801,11 @@ function init_actor(a,x,y,is_player)
 	a.targs={}
 	
 	--health
-	a.maxhp=3
-	a.hp=3
+	set_maxhp(a,3)
 	a.iframes=30 --invincibility frames
 	
 	--xp
-	a.maxxp=4
+	a.maxxp=3
 	a.xp=0
 	
 	--meter
@@ -911,7 +905,7 @@ function move_and_collide(a)
 			a.vx=0
 		end
 	end
-	a.x=clamp(a.x+a.vx,0,mw-hts)
+	a.x=clamp(a.x+a.vx,hts,1020)
 	
 	--handle y collision
 	bb=a.y-a.bbhh
@@ -932,7 +926,7 @@ function move_and_collide(a)
 			a.vy=0
 		end
 	end
-	a.y=clamp(a.y+a.vy,0,mh-hts)
+	a.y=clamp(a.y+a.vy,hts,508)
 	
 	--update speed
 	a.spd=get_vec_len(a.vx,a.vy)
@@ -1794,6 +1788,12 @@ function use_meter(a,v)
 	a.meter-=v
 	a.cooldwn=a.maxcooldwn
 end
+
+--set maxhp
+function set_maxhp(a,hp)
+	a.maxhp=hp
+	a.hp=hp
+end
 -->8
 --wraith
 
@@ -1842,6 +1842,9 @@ function make_wraith(x,y,is_player)
 		wraith.fight=wraith_fight
 		wraith.flee=wraith_flee
 	end
+	
+	--health
+	set_maxhp(wraith,2)
 	
 	--add to list
 	wraith.pool=wraiths
@@ -2818,8 +2821,7 @@ end
 
 --collect maxhp
 function collect_maxhp(a,maxhp)
-	a.maxhp+=1
-	a.hp+=1
+	set_maxhp(a,a.maxhp+1)
 	collect(a,maxhp)
 end
 
