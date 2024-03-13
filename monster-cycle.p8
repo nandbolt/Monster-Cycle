@@ -205,10 +205,10 @@ function _update()
 		--update camera
 		camx=lerp(camx,player.x-hss,
 			camaccel)
-		camx=clamp(camx,0,mw-ss)
+		camx=clamp(camx,0,896)
 		camy=lerp(camy,player.y-hss,
 			camaccel)
-		camy=clamp(camy,0,mh-ss)
+		camy=clamp(camy,0,384)
 		camera(camx,camy)
 		
 		--dead state
@@ -380,6 +380,11 @@ end
 --random integer
 function irnd(low,high)
 	return flr(rnd(high-low+1)+low)
+end
+
+--random range
+function rnd_range(amp)
+	return rnd(amp*2)-amp
 end
 
 --clamp
@@ -593,7 +598,7 @@ end
 function add_p2(x,y,c)
 	local p={}
 	init_p(p,x,y,c)
-	p.vx,p.vy=rnd(0.5)-0.25,rnd(0.5)-0.25
+	p.vx,p.vy=rnd_range(0.25),rnd_range(0.25)
 	p.life=90
 	p.sys=ps2
 	add(ps2,p)
@@ -868,12 +873,9 @@ function move_and_collide(a)
 		if a.dx!=0 or a.dy!=0 then
 			if a.inview then
 				local sfreq=clamp(flr(20-a.spd*10),1,10)
-				if gtime%sfreq==0 then
-					sfx(18)
-				end
-				add_p(a.x-clamp(a.vx+rnd(4)-2,
-					-8,8),a.y-clamp(a.vy+rnd(4)-2,
-					-8,8),1)
+				if (gtime%sfreq==0) sfx(18)
+				add_p(a.x+rnd_range(4),
+					a.y+rnd_range(4),1)
 			end
 		end
 	end
@@ -918,7 +920,7 @@ function move_and_collide(a)
 		collision=true
 		if (a.bounce) then
 			a.vy*=-1
-			ty=(bb+a.vx)/ts
+			ty=(bb+a.vy)/ts
 			if in_table(walls,mget(tx,ty)) then
 				a.vy=0
 			end
@@ -1362,19 +1364,16 @@ end
 
 --follow target
 function follow_targ(a)
-	a.dx=a.tx-a.x
-	a.dy=a.ty-a.y
-	
 	--add follow spread
-	a.dx+=rnd(1)*32-16
-	a.dy+=rnd(1)*32-16
+	a.dx=a.tx-a.x+rnd_range(32)
+	a.dy=a.ty-a.y+rnd_range(32)
 	normalize_dir(a)
 end
 
 --flee target
 function flee_targ(a)
-	a.dx=a.x-a.tx
-	a.dy=a.y-a.ty
+	a.dx=a.x-a.tx+rnd_range(32)
+	a.dy=a.y-a.ty+rnd_range(32)
 	normalize_dir(a)
 end
 
@@ -1439,8 +1438,8 @@ function descend(a)
 	
 	--blood
 	for i=1,8 do
-		add_p(a.x+rnd(1)*12-6,
-			a.y+rnd(1)*12-6,c)
+		add_p(a.x+rnd_range(6),
+			a.y+rnd_range(6),c)
 	end
 	
 	--destroy actor
@@ -1919,21 +1918,21 @@ end
 --update spawn point
 function update_spawnpoint(ethereal)
 	--choose tile
-	local tx,ty=irnd(0,mw/ts-1),irnd(0,mh/ts-1)
+	local tx,ty=irnd(0,127),irnd(0,63)
 	local iter=0
 	
 	--check tiles
-	while (iter<100) do
-		if (tx>mw/ts-1) then
+	while iter<50 do
+		if tx>127 then
 			--out of bounds
 			tx=0
-		elseif (point_in_view(tx*ts+hts,
-			ty*ts+hts)) then
+		elseif point_in_view(tx*ts+hts,
+			ty*ts+hts) then
 			--in view
 			tx+=1
-		elseif (not ethereal and 
+		elseif not ethereal and 
 			in_table(walls,
-			mget(tx,ty))) then
+			mget(tx,ty)) then
 			--in wall
 			tx+=1
 		else
@@ -2670,8 +2669,8 @@ function init_collectable(c,x,y)
 	--movement
 	c.x=x --x position
 	c.y=y --y position
-	c.vx=(rnd(1)-0.5)*4 --x velocity
-	c.vy=(rnd(1)-0.5)*4 --y velocity
+	c.vx=rnd_range(2) --x velocity
+	c.vy=rnd_range(2) --y velocity
 	c.spd=0 --speed (for queries)
 	c.maxspd=0 --current max move speed
 	c.accel=0.05 --move acceleration
