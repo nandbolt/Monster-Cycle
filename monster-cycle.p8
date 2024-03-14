@@ -8,6 +8,8 @@ __lua__
 gstate=0
 gtime=0 --game time (steps)
 ghigh=0 --high score (steps)
+hard_mode=false
+beat_game=false
 
 --camera
 camx=0 --camera x
@@ -28,12 +30,13 @@ tombs={10,11,12,47,63}
 beds={26,27,28,29,42,44,58,60}
 water={87,77,78,79}
 
---main menu
+--menus
 mmtimer=0
 mmx=0
 mmy=0
 mmstart=false
 mmomega=0.002778
+tcols={0,1,2,8}
 
 --delay
 delay=0
@@ -49,13 +52,11 @@ cfog={1,5,13}
 --target indicator
 ctarg={7}
 
---title
-tcols={0,1,2,8}
-
 --spirit plane
 spat={█,█,█,6730.5,▒,▒,░}
 csoff=1 --current spirit offset
 gsoff=1 --goal spirit offset
+spc=1 --spirit plane color
 
 --help
 tips={
@@ -79,6 +80,10 @@ tips={
 
 --init
 function _init()
+	--update fog
+	cfog[1]=spc
+	tcols[2]=spc
+	
 	--clear pools
 	ghosts={}
 	wraiths={}
@@ -98,8 +103,17 @@ function _init()
 		mmx=irnd(0,112)
 		mmy=irnd(0,48)
 		pmusic(40)
-		load_highscore()
+		cartdata(0)
+		load_highscore(0)
+		beat_game=ghigh>0
 	else
+		--load mode high
+		if hard_mode then
+			load_highscore(1)
+		else
+			load_highscore(0)
+		end
+		
 		--clear run
 		gtime=0
 		
@@ -174,12 +188,20 @@ function _update()
 				delay-=1
 			end
 			mmomega=lerp(mmomega,0,0.1)
-		elseif btnp(5) then
+		elseif btnp(5) or
+			(beat_game and btnp(4)) then
 			mmstart=true
 			fade=30
 			delay=30
-			sfx(1)
 			pmusic(-1) --stop music
+			if beat_game and btnp(4) then
+				--hard mode
+				hard_mode=true
+				spc=2
+				sfx(19)
+			else
+				sfx(1)
+			end
 		end
 	elseif gstate==gst_help then
 		--help menu
@@ -289,18 +311,20 @@ function _draw()
 			local xx,yy=camx+8,camy+33
 			
 			--death prompt
-			oprint("mORE THAN DEATH.",
-				xx,yy,8,1)
+			shdwprint("mORE THAN DEATH.",
+				xx,yy,8)
 			
 			--tip
 			yy+=24
-			oprint("tIP:\n"..tip,
-				xx,yy,7,1)
+			if not hard_mode then
+				shdwprint("tIP:\n"..tip,
+					xx,yy,7)
+			end
 			
 			--restart prompt
 			yy+=40
-			oprint("❎/x TO RETRY",
-				xx,yy,10,1)
+			shdwprint("❎/x TO RETRY",
+				xx,yy,10)
 		--victory menu
 		elseif gstate==gst_complete then
 			local xx,yy=camx+33,camy+17
@@ -316,15 +340,18 @@ function _draw()
 			local c,nh=7,""
 			if gtime==ghigh then
 				c=10
-				nh="(new high!)"
+				nh=" (new high!)"
+				if not beat_game then
+					nh+="\n☉hARD MODE UNLOCKED,\nRESET CART TO PLAY."
+				end
 			end
-			oprint("tIME:"..seconds..nh,
-				xx,yy,c,1)
+			shdwprint("⧗tIME "..seconds..nh,
+				xx,yy,c)
 			
 			--restart prompt
 			yy+=40
-			oprint("❎/x TO PLAY AGAIN",
-				xx,yy,7,1)
+			shdwprint("❎/x TO PLAY AGAIN",
+				xx,yy,7)
 		end
 		
 		--fade
@@ -450,7 +477,12 @@ end
 
 --50/50 chance
 function half_chance()
-	return rnd(1)<0.5
+	return chance(0.5)
+end
+
+--percent chance
+function chance(v)
+	return rnd(1)<v
 end
 
 --sine wave
@@ -1202,19 +1234,22 @@ function actor_kill(a)
 		spawn_xp(x,y,na)
 	end
 	
-	--drop hp (25% chance)
-	if rnd(1)<0.25 then
-		spawn_hp(x,y,na)
-	end
-	
-	--drop maxhp (10% chance)
-	if rnd(1)<0.1 then
-		spawn_maxhp(x,y,na)
-	end
-	
-	--drop monstrosity (5% chance)
-	if rnd(1)<0.05 then
-		spawn_msty(x,y,na)
+	--drop hps on normal mode
+	if not hard_mode then
+		--drop hp (25% chance)
+		if chance(0.25) then
+			spawn_hp(x,y,na)
+		end
+		
+		--drop maxhp (5% chance)
+		if chance(0.05) then
+			spawn_maxhp(x,y,na)
+		end
+		
+		--drop monstrosity (5% chance)
+		if chance(0.05) then
+			spawn_msty(x,y,na)
+		end
 	end
 end
 
@@ -1759,6 +1794,7 @@ end
 
 --damage actor
 function dmg_actor(a,dmg)
+	if (hard_mode) dmg=999
 	a.hp-=dmg
 	if a.hp<=0 then
 		actor_kill(a)
@@ -1953,7 +1989,7 @@ function update_spawner()
 		if #ghosts+#wraiths<6 then
 			--spawn spirit
 			update_spawnpoint(true)
-			if rnd(1)<0.4 then
+			if chance(0.4) then
 				make_wraith(spnrx,spnry,false)
 			else
 				make_ghost(spnrx,spnry,false)
@@ -1961,7 +1997,7 @@ function update_spawner()
 		elseif #zombies+#skeletons<12 then
 			--spawn undead
 			update_spawnpoint(false)
-			if rnd(1)<0.4 then
+			if chance(0.4) then
 				make_skeleton(spnrx,spnry,false)
 			else
 				make_zombie(spnrx,spnry,false)
@@ -1995,7 +2031,7 @@ end
 function draw_spirit_plane()
 	local x,y,w,h=camx,camy,
 		120,ts
-	color(1)
+	color(spc)
 	for i=flr(csoff),7 do
 		fillp(spat[i])
 		rectfill(x,y,x+w,y+h)
@@ -2440,7 +2476,7 @@ function draw_mainmenu()
 	foreach(ps2,draw_p2)
 	
 	--monster cycle
-	circ(hss,hss,33,1)
+	circ(hss,hss,33,spc)
 	circ(hss,hss,31)
 	circ(hss,hss,32,7)
 	draw_mmsprite(2,0.22)   --ghost
@@ -2455,38 +2491,26 @@ function draw_mainmenu()
 	tprint("monster cycle",39,9)
 	
 	--play prompt
-	oprint("pRESS ❎/x",43,
+	local str="pRESS ❎/x"
+	if (beat_game) str="❎/x:normal\n🅾️/z:hard"
+	shdwprint(str,43,
 		63+swave(mmomega*6,mmtimer,
-		0,4),10,1)
+		0,4),10)
 	
 	--credits
-	oprint("gAME BY nandbolt (V1.0.1)",
-		13,114,6,1)
-	oprint("♪mUSIC BY @jAMAILmUSIC",
-		16,105,12,1)
+	shdwprint("gAME BY nandbolt (V1.0.1)",
+		13,114,6)
+	shdwprint("♪mUSIC BY @jAMAILmUSIC",
+		16,105,12)
 	
 	--fade
 	if (mmstart) draw_fadeout()
 end
 
---print outlined text
-function oprint(str,x,y,c1,c2)
-	cursor(x-1,y)
-	print(str,c2)
-	cursor(x+1,y)
-	print(str)
-	cursor(x,y-1)
-	print(str)
-	cursor(x,y+1)
-	print(str)
-	cursor(x,y)
-	print(str,c1)
-end
-
 --print shadowed text
 function shdwprint(str,x,y,c)
 	cursor(x-1,y-1)
-	print(str,1)
+	print(str,spc)
 	cursor(x,y)
 	print(str,c)
 end
@@ -2520,14 +2544,14 @@ end
 function draw_fadeout()
 	local r=92*(1-(fade/30))
 	circfill(camx+hss,
-		camy+hss,r,1)
+		camy+hss,r,spc)
 end
 
 --draw fade in
 function draw_fadein()
 	local r=92*(fade/30)
 	circfill(camx+hss,
-		camy+hss,r,1)
+		camy+hss,r,spc)
 end
 
 --shadow bar
@@ -2536,7 +2560,7 @@ end
 -- v=value of bar (0=empty,1=full)
 -- c=color
 function shdwbar(x,y,w,h,v,c)
-	rectfill(x-1,y-1,x+w-1,y+h-1,1)
+	rectfill(x-1,y-1,x+w-1,y+h-1,spc)
 	if v>0 then
 		rectfill(x,y,
 			x+flr(clamp(w*v,0,w)),
@@ -2549,11 +2573,13 @@ function draw_hud()
 	local xx,yy=camx+12,camy+4
 	
 	--bars
-	shdwbar(xx,yy,32,2,
-		player.hp/player.maxhp,8)
-	draw_bardivs(xx,yy,
-		player.maxhp)
-	yy+=8
+	if not hard_mode then
+		shdwbar(xx,yy,32,2,
+			player.hp/player.maxhp,8)
+		draw_bardivs(xx,yy,
+			player.maxhp)
+		yy+=8
+	end
 	shdwbar(xx,yy,32,2,
 		player.xp/player.maxxp,10)
 	draw_bardivs(xx,yy,
@@ -2574,31 +2600,34 @@ function draw_hud()
 	--prints
 	xx=camx+2
 	yy=camy+2
-	shdwprint("♥",xx,yy,8)
-	yy+=8
+	if not hard_mode then
+		shdwprint("♥",xx,yy,8)
+		yy+=8
+	end
 	shdwprint("xp",xx,yy,10)
 	yy+=8
 	shdwprint("★",xx,yy,7)
 	
-	--controls
-	yy=camy+116
-	local c1,c2=13,13
-	if (player.oaction) c1=12
-	if (player.xaction) c2=14
-	shdwprint(player.oprompt,
-		xx,yy,c1)
-	yy-=8
-	shdwprint(player.xprompt,
-		xx,yy,c2)
-	
-	--goal
-	xx+=48
-	yy=camy+2
-	c1=7
-	if (player.xp>=player.maxxp) c1=10
-	shdwprint(player.goal,
-		xx,yy,c1)
+	if not hard_mode then
+		--controls
+		yy=camy+116
+		local c1,c2=13,13
+		if (player.oaction) c1=12
+		if (player.xaction) c2=14
+		shdwprint(player.oprompt,
+			xx,yy,c1)
+		yy-=8
+		shdwprint(player.xprompt,
+			xx,yy,c2)
 		
+		--goal
+		xx+=48
+		yy=camy+2
+		c1=7
+		if (player.xp>=player.maxxp) c1=10
+		shdwprint(player.goal,
+			xx,yy,c1)
+	end
 	--highscore
 	local hseconds=flr(ghigh/30)
 	if (ghigh==0) hseconds="none"
@@ -2617,9 +2646,13 @@ end
 
 --draw help menu
 function draw_helpmenu()
-	cls(1)
+	cls(spc)
 	cursor(8,8)
-	print("tHERE IS NO END IN DEATH.\naS A LOWLY SPIRIT, FIGHT\nFOR SURVIVAL AND GAIN\nENOUGH xp TO ASCEND\nTO THE NEXT MONSTER TIER.\neSCAPE THE monster cycle!\n\ncONTROLS\n⬆️⬇️⬅️➡️:mOVE\n🅾️/z:aBILITY 1\n❎/x:aBILITY 2\np/enter:pAUSE\n\n*tIP*\n"..tip.."\n\n❎/x TO START",7)
+	if hard_mode then
+		print("hard mode\neVERYTHING INSTAKILLS.\n\n❎/x TO DIE",7)
+	else
+		print("tHERE IS NO END IN DEATH.\naS A LOWLY SPIRIT, FIGHT\nFOR SURVIVAL AND GAIN\nENOUGH xp TO ASCEND\nTO THE NEXT MONSTER TIER.\neSCAPE THE monster cycle!\n\ncONTROLS\n⬆️⬇️⬅️➡️:mOVE\n🅾️/z:aBILITY 1\n❎/x:aBILITY 2\np/enter:pAUSE\n\n*tIP*\n"..tip.."\n\n❎/x TO START",7)
+	end
 end
 
 --draw bar dividers
@@ -2630,22 +2663,33 @@ end
 function draw_bardivs(x,y,mv)
 	for i=0,mv do
 		local xx=x+flr(i*32/mv)
-		line(xx,y,xx,y+2,1)
+		line(xx,y,xx,y+2,spc)
 	end
 end
+
+--draw arc
+--function draw_arc(x,y,r,v,c)
+--	v=r*2*v+1
+--	clip(x-camx-r,y-camy-r,v,r*2+1)
+--	circ(x,y,r,c)
+--	clip()
+--end
 -->8
 --misc
 
 --save highscore
 function save_highscore(score)
-	dset(0,score)
+	if hard_mode then
+		dset(1,score)
+	else
+		dset(0,score)
+	end
 	ghigh=score
 end
 
 --load highscore
-function load_highscore()
-	cartdata(0)
-	ghigh=dget(0)
+function load_highscore(n)
+	ghigh=dget(n)
 end
 
 --play music
