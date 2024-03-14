@@ -1918,7 +1918,7 @@ function make_wraith(x,y,is_player)
 	end
 	
 	--health
-	set_maxhp(wraith,2)
+	set_maxhp(wraith,1)
 	
 	--add to list
 	wraith.pool=wraiths
