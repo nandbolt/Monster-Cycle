@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
---monster cycle(v1.0.1)
+--monster cycle(v1.1.0)
 --by nandbolt
 
 --game state
@@ -64,10 +64,10 @@ tips={
 	"😐zOMBIE BREATH GOES\nTHROUGH WALLS.",
 	"☉mONSTERS FLEE WHEN THEIR\n★ABILITIES ARE ON COOLDOWN.",
 	"웃hUMANS CAN EITHER HAVE\nA PISTOL OR KNIFE.",
-	"🐱sPIRITS NEED 4 xp\nTO BECOME UNDEAD.",
+	"🐱sPIRITS NEED 3 xp\nTO BECOME UNDEAD.",
 	"웃hUMANS NEED 16 xp\nTO ASCEND.",
 	"bEWARE OF RAINBOW ☉MONSTERS!\ntHEY CAN ✽INSTAKILL.",
-	"tHERES A 10% CHANCE A MONSTER\nDROPS A ♥MAXHP+.",
+	"tHERES A 5% CHANCE A MONSTER\nDROPS A ♥MAXHP+.",
 	"tHERES A 5% CHANCE A MONSTER\nDROPS A ●RAINBOW MONSTROSITY.",
 	"tHERES A 25% CHANCE A MONSTER\nDROPS A ♥HP+.",
 	"🐱wRAITHS DEAL 2 DAMAGE\nWITH THEIR ●BLAST.",
@@ -76,6 +76,9 @@ tips={
 	"wHAT YOU CAN'T ☉SEE MAY\nSTILL EXIST.",
 	"ˇdON'T GIVE UP!ˇ",
 	"tHERE ARE 3 MONSTER TIERS:\n🐱SPIRITS 😐UNDEAD 웃HUMANS",
+	"🐱sPIRITS HAVE NO TRAIL WHEN\n★ABILITIES ARE ON COOLDOWN.",
+	"웃hUMANS AND 😐UNDEAD\nBLEED WHEN HURT.",
+	"oTHER ☉MONSTERS AIM\nWHERE THEY'RE FACING.",
 }
 
 --init
@@ -317,7 +320,7 @@ function _draw()
 			--tip
 			yy+=24
 			if not hard_mode then
-				shdwprint("tIP:\n"..tip,
+				shdwprint("*tIP*\n"..tip,
 					xx,yy,7)
 			end
 			
@@ -2529,7 +2532,7 @@ function draw_mainmenu()
 		0,4),10)
 	
 	--credits
-	shdwprint("gAME BY nandbolt (V1.0.1)",
+	shdwprint("gAME BY nandbolt (V1.1.0)",
 		13,114,6)
 	shdwprint("♪mUSIC BY @jAMAILmUSIC",
 		16,105,12)
