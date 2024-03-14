@@ -962,7 +962,7 @@ function move_and_collide(a)
 	a.y=clamp(a.y+a.vy,hts,508)
 	
 	--update speed
-	a.spd=get_vec_len(a.vx,a.vy)
+	a.spd=get_spd(a)
 	
 	--update view
 	a.inview=point_in_view(a.x,a.y)
@@ -1534,16 +1534,17 @@ function update_blaster(a)
 	--check blast input + meter cost
 	if a.xactionp and a.meter>0 then
 		--update speed(add to projectile velocity)
-		a.spd=get_vec_len(a.vx,a.vy)
+		a.spd=get_spd(a)
 		
 		--standing shot
 		update_standing_shot(a)
 		
 		--blast
-		spawn_proj(a,a.x,a.y,a.dx,a.dy,a.pburst)
+		local dx,dy=get_aimdir(a)
+		spawn_proj(a,a.x,a.y,dx,dy,a.pburst)
 		use_meter(a,a.pcost)
-		a.vx+=-a.dx*a.precoil
-		a.vy+=-a.dy*a.precoil
+		a.vx+=-dx*a.precoil
+		a.vy+=-dy*a.precoil
 		
 		--cooldown
 		a.xactionp=false
@@ -1555,47 +1556,62 @@ function update_blaster(a)
 	end
 end
 
+function get_aimdir(a)
+	if a!=player then
+		return a.xfacing,a.yfacing
+	end
+	return a.dx,a.dy
+end
+
 --update blaster 2
 function update_blaster2(a)
 	--check blast input + meter cost
 	if a.oactionp and a.meter>0 then
 		--update speed(add to projectile velocity)
-		a.spd=get_vec_len(a.vx,a.vy)
+		a.spd=get_spd(a)
 		
 		--standing shot
 		update_standing_shot(a)
 		
 		--blast
-		spawn_proj(a,a.x,a.y,a.dx,a.dy,a.pburst)
+		local dx,dy=get_aimdir(a)
+		spawn_proj(a,a.x,a.y,dx,dy,
+			a.pburst)
 		local ds={}
-		if a.dx>0 then
-			if a.dy>0 then
+		if dx>0 then
+			if dy>0 then
 				ds={1,0,0,1} --southeast
-			elseif a.dy<0 then
+			elseif dy<0 then
 				ds={0,-1,1,0} --northeast
 			else
-				ds={rt2o2,-rt2o2,rt2o2,rt2o2} --east
+				ds={rt2o2,-rt2o2,rt2o2,
+					rt2o2} --east
 			end
-		elseif a.dx<0 then
-			if a.dy>0 then
+		elseif dx<0 then
+			if dy>0 then
 				ds={-1,0,0,1} --southwest
-			elseif a.dy<0 then
+			elseif dy<0 then
 				ds={0,-1,-1,0} --northwest
 			else
-				ds={-rt2o2,-rt2o2,-rt2o2,rt2o2} --west
+				ds={-rt2o2,-rt2o2,-rt2o2,
+					rt2o2} --west
 			end
 		else
-			if a.dy>0 then
-				ds={-rt2o2,rt2o2,rt2o2,rt2o2} --south
+			if dy>0 then
+				ds={-rt2o2,rt2o2,rt2o2,
+					rt2o2} --south
 			else
-				ds={-rt2o2,-rt2o2,rt2o2,-rt2o2} --north
+				ds={-rt2o2,-rt2o2,rt2o2,
+					-rt2o2} --north
 			end
 		end
-		spawn_proj(a,a.x,a.y,ds[1],ds[2],a.pburst+a.spd)
-		spawn_proj(a,a.x,a.y,ds[3],ds[4],a.pburst+a.spd)
+		spawn_proj(a,a.x,a.y,ds[1],
+			ds[2],a.pburst+a.spd)
+		spawn_proj(a,a.x,a.y,ds[3],
+			ds[4],a.pburst+a.spd)
 		use_meter(a,a.pcost*3)
-		a.vx+=-a.dx*a.precoil
-		a.vy+=-a.dy*a.precoil
+		a.vx+=-dx*a.precoil
+		a.vy+=-dy*a.precoil
 		
 		--cooldown
 		a.oactionp=false
@@ -1661,7 +1677,7 @@ function update_item(a)
 		--check blast input + meter cost
 		if a.xactionp and a.meter>0 then
 			--update speed(add to projectile velocity)
-			a.spd=get_vec_len(a.vx,a.vy)
+			a.spd=get_spd(a)
 			
 			--blast
 			local xoff=a.itmxoff+hts
@@ -1843,6 +1859,11 @@ end
 function set_maxhp(a,hp)
 	a.maxhp=hp
 	a.hp=hp
+end
+
+--get speed
+function get_spd(a)
+	return get_vec_len(a.vx,a.vy)
 end
 -->8
 --wraith
@@ -2360,8 +2381,7 @@ function spawn_proj(a,x,y,dx,dy,burst)
 	proj.y=y --y position
 	proj.vx=a.vx+dx*burst --x velocity
 	proj.vy=a.vy+dy*burst --y velocity
-	proj.spd=get_vec_len(proj.vx,
-		proj.vy) --speed (for queries)
+	proj.spd=get_spd(proj) --speed (for queries)
 	proj.maxspd=a.pspd --current max move speed
 	proj.normspd=a.pspd --normal max move speed
 	proj.accel=a.paccel --acceleration
