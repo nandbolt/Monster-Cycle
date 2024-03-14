@@ -342,7 +342,7 @@ function _draw()
 				c=10
 				nh=" (new high!)"
 				if not beat_game then
-					nh+="\n☉hARD MODE UNLOCKED,\nRESET CART TO PLAY."
+					nh=nh.."\n\n☉hARD MODE UNLOCKED,\nRESET CART TO PLAY."
 				end
 			end
 			shdwprint("⧗tIME "..seconds..nh,
@@ -697,7 +697,6 @@ function make_zombie(x,y,is_player)
 	
 	--trail
 	init_trail(zombie,11)
-	zombie.trailon=false
 	
 	--sprite
 	zombie.rsprs={33,49}
@@ -1093,26 +1092,42 @@ end
 function init_trail(a,c)
 	a.normctrail=c --normal trail color
 	a.ctrail=a.normctrail --trail color
-	a.trailon=true --trail on
 	a.tps=ps --trail particle system
 end
 
 --update trail
 function update_trail(a)
 	if a.inview then
-		if a.trailon or a.xp>=a.maxxp then
-			if a.msty then
-				update_msty_trail(a)
-			elseif a.xp>=a.maxxp then
-				a.ctrail=10
-			elseif a.dashing then
-				a.ctrail=a.dashctrail
-			else
-				a.ctrail=a.normctrail
-			end
-			add_p(a.x+irnd(-a.bbhw,a.bbhw),
-				a.y+irnd(-a.bbhh,a.bbhh),a.ctrail)
+		--spirits don't emit when low meter
+		if a.ethereal and
+			a.meter<=0 then
+			return
 		end
+		
+		--monstrocity
+		if a.msty then
+			update_msty_trail(a)
+		--xp
+		elseif a.xp>=a.maxxp then
+			a.ctrail=10
+		--dash
+		elseif a.dashing then
+			a.ctrail=a.dashctrail
+		--normal
+		else
+			a.ctrail=a.normctrail
+			if not a.ethereal then
+				if a.hp<a.maxhp then
+					a.ctrail=8
+				else
+					return
+				end
+			end
+		end
+		
+		--trail
+		add_p(a.x+irnd(-a.bbhw,a.bbhw),
+			a.y+irnd(-a.bbhh,a.bbhh),a.ctrail)
 	end
 end
 
@@ -2073,7 +2088,6 @@ function make_skeleton(x,y,is_player)
 	
 	--trail
 	init_trail(skeleton,7)
-	skeleton.trailon=false
 	
 	--sprite
 	skeleton.rsprs={36,52}
@@ -2189,7 +2203,6 @@ function make_human(x,y,is_player)
 	
 	--trail
 	init_trail(human,4)
-	human.trailon=false
 	
 	--sprite
 	if half_chance() then
@@ -2476,8 +2489,6 @@ function draw_mainmenu()
 	foreach(ps2,draw_p2)
 	
 	--monster cycle
-	circ(hss,hss,33,spc)
-	circ(hss,hss,31)
 	circ(hss,hss,32,7)
 	draw_mmsprite(2,0.22)   --ghost
 	draw_mmsprite(5,0.28)   --wraith
@@ -2887,7 +2898,6 @@ end
 --collect monstrosity
 function collect_msty(a,msty)
 	a.msty=true
-	a.trailon=true
 	collect(a,msty)
 end
 
